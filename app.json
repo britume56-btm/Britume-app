@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "BRITUME",
+    "slug": "britume",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "britume",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.britume.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.britume.app"
+    }
+  }
+}

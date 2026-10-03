@@ -6,11 +6,27 @@
     "orientation": "portrait",
     "scheme": "britume",
     "userInterfaceStyle": "dark",
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "BRITUME uses Face ID to keep your account secure."
+        }
+      ]
+    ],
     "android": {
-      "package": "com.britume.app"
+      "package": "com.britume.app",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC"
+      ]
     },
     "ios": {
-      "bundleIdentifier": "com.britume.app"
+      "bundleIdentifier": "com.britume.app",
+      "entitlements": {
+        "keychain-access-groups": [
+          "$(AppIdentifierPrefix)com.britume.app"
+        ]
+      }
     }
   }
 }

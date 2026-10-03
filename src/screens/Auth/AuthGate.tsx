@@ -8,7 +8,7 @@ import {
   View,
   Pressable,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../../lib/supabase';
 
 type Mode = 'welcome' | 'signup' | 'signin';
 

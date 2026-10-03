@@ -6,7 +6,7 @@ export async function uploadAvatar(fileUri: string, userId: string) {
   const response = await fetch(fileUri);
   const blob = await response.blob();
 
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from('avatars')
     .upload(fileName, blob, {
       contentType: 'image/jpeg',
@@ -17,9 +17,14 @@ export async function uploadAvatar(fileUri: string, userId: string) {
     throw error;
   }
 
-  const { data: publicUrlData } = supabase.storage
+  // Use signed URL for private bucket (1 hour expiry = 3600 seconds)
+  const { data, error: signedUrlError } = await supabase.storage
     .from('avatars')
-    .getPublicUrl(fileName);
+    .createSignedUrl(fileName, 60 * 60);
 
-  return publicUrlData.publicUrl;
+  if (signedUrlError) {
+    throw signedUrlError;
+  }
+
+  return data.signedUrl;
 }

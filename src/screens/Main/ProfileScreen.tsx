@@ -10,7 +10,7 @@ import {
   Button,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../../lib/supabase';
 import { saveProfile, fetchProfile, type ProfileRecord } from '../../services/profileService';
 import { uploadAvatar } from '../../services/storageService';
 
@@ -85,7 +85,7 @@ export default function ProfileScreen() {
       username: username.trim(),
       display_name: displayName.trim() || user.email?.split('@')[0] || 'BRITUME User',
       avatar_url: avatarUrl ?? '',
-      phone: user.user_metadata?.phone ?? null,
+      phone: (user.user_metadata as Record<string, any>)?.phone ?? null,
     });
 
     setSaving(false);

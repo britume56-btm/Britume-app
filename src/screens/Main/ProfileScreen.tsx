@@ -10,7 +10,7 @@ import {
   Button,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../../lib/supabase';
 import { saveProfile, fetchProfile, type ProfileRecord } from '../../services/profileService';
 import { uploadAvatar } from '../../services/storageService';
 

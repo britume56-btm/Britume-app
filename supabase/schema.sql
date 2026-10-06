@@ -4,11 +4,51 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text unique,
   display_name text,
-  avatar_url text,
+  avatar_path text,
   phone text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles
+  add column if not exists avatar_path text;
+
+-- Existing versions stored expiring signed URLs in avatar_url. Recover the
+-- private bucket object path where possible, then clear those stale URLs.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'avatar_url'
+  ) then
+    execute $migration$
+      update public.profiles
+      set avatar_path = split_part(
+        split_part(avatar_url, '/object/sign/avatars/', 2),
+        '?',
+        1
+      )
+      where avatar_path is null
+        and position('/object/sign/avatars/' in avatar_url) > 0
+        and split_part(
+          split_part(avatar_url, '/object/sign/avatars/', 2),
+          '?',
+          1
+        ) <> ''
+    $migration$;
+
+    execute $migration$
+      update public.profiles
+      set avatar_url = null
+      where avatar_path is not null
+        and avatar_url like '%/object/sign/avatars/%'
+    $migration$;
+  end if;
+end
+$$;
 
 create or replace function public.handle_updated_at()
 returns trigger
@@ -80,3 +120,8 @@ using (
   bucket_id = 'avatars'
   and auth.uid()::text = (storage.foldername(name))[1]
 );
+
+-- Keep an already-created avatars bucket private; this does not create it.
+update storage.buckets
+set public = false
+where id = 'avatars';

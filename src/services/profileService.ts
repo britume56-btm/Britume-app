@@ -20,7 +20,7 @@ export async function saveProfile(input: {
   id: string;
   username: string;
   display_name: string;
-  avatar_url: string;
+  avatar_path: string | null;
   phone: string | null;
 }): Promise<ProfileRecord | null> {
   const { data, error } = await supabase
@@ -30,7 +30,7 @@ export async function saveProfile(input: {
         id: input.id,
         username: input.username || null,
         display_name: input.display_name || null,
-        avatar_url: input.avatar_url || null,
+        avatar_path: input.avatar_path || null,
         phone: input.phone,
         updated_at: new Date().toISOString(),
       },

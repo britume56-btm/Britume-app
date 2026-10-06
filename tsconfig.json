@@ -12,9 +12,8 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

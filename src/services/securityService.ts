@@ -31,8 +31,8 @@ export async function authenticateWithBiometrics(): Promise<boolean> {
   try {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: 'Authenticate to access BRITUME',
-      fallbackLabel: 'Use passcode',
-      disableDeviceFallback: false,
+      fallbackLabel: 'Use PIN',
+      disableDeviceFallback: true,
     });
 
     return result.success;
@@ -43,6 +43,10 @@ export async function authenticateWithBiometrics(): Promise<boolean> {
 }
 
 export async function savePinSecurely(pin: string, userId: string): Promise<boolean> {
+  if (!/^\d{4,8}$/.test(pin)) {
+    return false;
+  }
+
   try {
     await SecureStore.setItemAsync(`britume-pin-${userId}`, pin);
     return true;
@@ -52,12 +56,31 @@ export async function savePinSecurely(pin: string, userId: string): Promise<bool
   }
 }
 
+export async function isPinConfigured(userId: string): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(`britume-pin-${userId}`)) !== null;
+  } catch (error) {
+    console.error('PIN status check failed:', error);
+    throw error;
+  }
+}
+
 export async function verifyPinSecurely(pin: string, userId: string): Promise<boolean> {
   try {
     const stored = await SecureStore.getItemAsync(`britume-pin-${userId}`);
     return stored === pin;
   } catch (error) {
     console.error('PIN verify failed:', error);
+    return false;
+  }
+}
+
+export async function deletePinSecurely(userId: string): Promise<boolean> {
+  try {
+    await SecureStore.deleteItemAsync(`britume-pin-${userId}`);
+    return true;
+  } catch (error) {
+    console.error('PIN removal failed:', error);
     return false;
   }
 }

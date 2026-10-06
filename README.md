@@ -1,6 +1,6 @@
-# BRITUME — Real Foundation & Test App
+# BRITUME — Mobile App Foundation
 
-This is the BRITUME mobile app foundation with real Supabase authentication, profile system, and app shell.
+BRITUME is an Expo + React Native + TypeScript app backed by Supabase. This repository preserves the existing authentication and profile foundation; modules are connected incrementally rather than shipped as placeholders pretending to be complete.
 
 ## What's Included
 
@@ -8,11 +8,12 @@ This is the BRITUME mobile app foundation with real Supabase authentication, pro
 ✅ **Session persistence with AsyncStorage**
 ✅ **Email verification with deep-link callback**
 ✅ **User profile system (username, display name, avatar)**
-✅ **Avatar upload to Supabase Storage**
+✅ **Private avatar upload stores an object path; the app creates short-lived signed URLs for display**
 ✅ **App shell with bottom tab navigation**
-✅ **BRITUME ecosystem sections (LIVING, SOCIAL, CHAT, etc.)**
-✅ **Settings screen**
-✅ **Security & biometric foundation**
+✅ **BRITUME section tiles navigate to their section screens**
+✅ **SecureStore PIN setup, change, verification, and app-resume locking**
+✅ **Device biometrics through Expo Local Authentication**
+🟡 **Account and Security settings work; other settings and BRITUME modules are clearly marked as not built yet**
 ✅ **TypeScript strict mode**
 
 ## Quick Start
@@ -26,77 +27,24 @@ npm install
 ### 2. Set Up Supabase
 
 1. Create a Supabase project at https://supabase.com
-2. Copy `.env.example` to `.env`
-3. Fill in:
+2. For local development, copy `.env.example` to an ignored local `.env`; for hosted builds, configure the matching environment variables in the project secrets/build environment.
+3. Set:
    - `EXPO_PUBLIC_SUPABASE_URL` — your Supabase project URL
-   - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — your public anon key
+   - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — your public publishable/anon key
 4. Enable Email authentication in Supabase
 5. Add deep-link redirect URL: `britume://auth/callback`
-6. Run the SQL from `supabase/schema.sql` in the Supabase SQL Editor
-7. Create a storage bucket named `avatars` (private access)
+6. Create a storage bucket named `avatars` with **Public access off**
+7. Run `supabase/schema.sql` in the Supabase SQL Editor
 
-### 3. Create the avatars bucket
+For an **existing** database that still has `profiles.avatar_url`, run
+`supabase/migrations/20261005000000_profile_avatar_paths.sql` before deploying
+the updated app. It adds `avatar_path`, recovers paths from recognized Supabase
+signed avatar URLs, and clears the migrated expiring URLs.
 
-In Supabase dashboard:
-- Storage → Create bucket
-- Name: `avatars`
-- Public access: OFF
-
-### 4. Create the profiles table RLS policies
-
-Run this SQL in the Supabase SQL Editor:
-
-```sql
-create extension if not exists "pgcrypto";
-
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  username text unique,
-  display_name text,
-  avatar_url text,
-  phone text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create or replace function public.handle_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-create trigger handle_profiles_updated_at
-before update on public.profiles
-for each row
-execute function public.handle_updated_at();
-
-alter table public.profiles enable row level security;
-
-create policy "Profiles are viewable by owner"
-on public.profiles
-for select
-using (auth.uid() = id);
-
-create policy "Profiles are insertable by owner"
-on public.profiles
-for insert
-with check (auth.uid() = id);
-
-create policy "Profiles are updateable by owner"
-on public.profiles
-for update
-using (auth.uid() = id)
-with check (auth.uid() = id);
-
-create policy "Profiles are deletable by owner"
-on public.profiles
-for delete
-using (auth.uid() = id);
-```
+Only the public Supabase URL and publishable/anon key belong in the app. Values
+prefixed with `EXPO_PUBLIC_` are bundled into the client and are **not secrets**;
+never put a Supabase `service_role` key in the app, `.env.example`, or source
+control.
 
 ### 5. Start the App
 
@@ -115,8 +63,9 @@ Then:
 2. **Check your email** for verification link
 3. **Click the link** — it will deep-link to the app and sign you in
 4. **Go to PROFILE** — upload an avatar, set your display name
-5. **Explore LIVING, SETTINGS** — see the app shell
-6. **Sign out** from SETTINGS
+5. **Set a PIN** from SETTINGS → Security, then background and reopen the app to verify the lock
+6. **Explore section tiles** — unfinished modules open an explicit foundation screen
+7. **Sign out** from SETTINGS
 
 ## Project Structure
 
@@ -126,39 +75,45 @@ src/
     Auth/
       AuthGate.tsx       # Welcome, Sign up, Sign in screens
     Main/
-      HomeScreen.tsx     # BRITUME ecosystem view
+      HomeScreen.tsx     # Navigable BRITUME section tiles
+      ModuleScreen.tsx   # Honest placeholder for modules not built yet
       ProfileScreen.tsx  # Profile + avatar upload
-      SettingsScreen.tsx # Settings & sign out
+      SettingsScreen.tsx # Profile/security routes and sign out
     Security/
-      AppLockScreen.tsx  # App lock + biometric foundation
+      AppLockScreen.tsx  # PIN management, PIN unlock, biometric unlock
+  security/
+    AppLockContext.tsx   # SecureStore status + app lifecycle locking
   services/
     authService.ts       # Auth helpers
     profileService.ts    # Profile CRUD
-    storageService.ts    # Avatar upload
-    avatarService.ts     # Signed URLs (private avatars)
-    securityService.ts   # Biometric + PIN storage
+    storageService.ts    # Private avatar upload (returns object path)
+    avatarService.ts     # Fresh signed URLs for private avatars
+    securityService.ts   # Biometric APIs + secure PIN storage
   navigation/
-    AppNavigator.tsx     # Bottom tab navigation
+    AppNavigator.tsx     # Tab + section/security stack navigation
   constants/
     sections.ts          # BRITUME sections
   types/
     profile.ts           # TypeScript profile type
 ```
 
-## Next Steps
+## Recommended build order
 
-- Add account settings (email change, password change)
-- Add privacy controls
-- Add notification preferences
-- Add theme switching
-- Build individual BRITUME modules (SOCIAL, CHAT, GAMES, etc.)
-- Add secure PIN + biometric app lock
-- Add payment / subscriptions
+1. Finish account recovery and email/password change flows.
+2. Build one well-defined module end to end (recommended: SOCIAL) with its own
+   data model, RLS policies, screens, and tests.
+3. Build CHAT on top of the account/profile foundation, then notifications.
+4. Add privacy controls and data export/delete flows before broader social launch.
+5. Add appearance, language, storage reporting, and About settings.
+6. Continue with GAMES, TECHNOLOGIES, TV, STUDIOS, WEAR, LABS, THEMES, and
+   GALLERY one module at a time; introduce payments only when a module needs them.
 
 ## Notes
 
 - **Biometric API** uses official OS APIs — no biometric data stored by the app
 - **Secure storage** uses `expo-secure-store` for PIN storage
+- **App lock** is enforced after an authenticated app launch and after returning from the background
+- **Avatar records** store `avatar_path`; signed URLs are generated for display and are never saved to profiles
 - **Row Level Security** prevents users from seeing/editing other profiles
 - **No fake auth** — real Supabase email verification
 - **One unified app** — BRITUME is not separate mini-apps
@@ -166,9 +121,9 @@ src/
 ## Support
 
 For issues, check:
-- `.env` file is created and filled
+- Local `.env` is ignored; hosted builds have both required `EXPO_PUBLIC_` variables configured
 - Supabase project is set up with profiles table and avatars bucket
 - Deep-link redirect URL is added: `britume://auth/callback`
 - Email verification is enabled in Supabase Auth settings
 
-Run `npx expo doctor` to check your Expo setup.
+Run `npm run typecheck` and `npx expo install --check` before shipping changes.

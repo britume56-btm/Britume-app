@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Alert,
   Image,
@@ -10,36 +10,96 @@ import {
   Button,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../../lib/supabase';
-import { saveProfile, fetchProfile, type ProfileRecord } from '../../services/profileService';
+import { getAvatarSignedUrl, getLegacyAvatarObjectPath } from '../../services/avatarService';
+import { saveProfile, fetchProfile } from '../../services/profileService';
 import { uploadAvatar } from '../../services/storageService';
+import type { ProfileRecord } from '../../types/profile';
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const loadProfile = async () => {
-      const user = (await supabase.auth.getUser()).data.user;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+    let active = true;
 
-      const profileData = await fetchProfile(user.id);
-      setProfile(profileData);
-      setUsername(profileData?.username ?? '');
-      setDisplayName(profileData?.display_name ?? '');
-      setAvatarUrl(profileData?.avatar_url ?? null);
-      setLoading(false);
+    const loadProfile = async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          throw error;
+        }
+
+        if (!data.user) {
+          if (active) {
+            setProfile(null);
+          }
+          return;
+        }
+
+        const profileData = await fetchProfile(data.user.id);
+        if (!active) {
+          return;
+        }
+
+        setProfile(profileData);
+        setUsername(profileData?.username ?? '');
+        setDisplayName(profileData?.display_name ?? '');
+        setAvatarPath(
+          profileData?.avatar_path ??
+            getLegacyAvatarObjectPath(profileData?.avatar_url, data.user.id)
+        );
+      } catch (error) {
+        Alert.alert(
+          'Could not load profile',
+          error instanceof Error ? error.message : 'Please try again.'
+        );
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
     };
 
     void loadProfile();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      if (avatarPath) {
+        void getAvatarSignedUrl(avatarPath)
+          .then((url) => {
+            if (active) {
+              setAvatarUrl(url);
+            }
+          })
+          .catch((error) => {
+            console.error('Avatar URL refresh failed:', error);
+            if (active) {
+              setAvatarUrl(null);
+            }
+          });
+      } else {
+        setAvatarUrl(null);
+      }
+
+      return () => {
+        active = false;
+      };
+    }, [avatarPath])
+  );
 
   const pickAvatar = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -60,7 +120,9 @@ export default function ProfileScreen() {
     }
 
     try {
-      const url = await uploadAvatar(result.assets[0].uri, user.id);
+      const path = await uploadAvatar(result.assets[0].uri, user.id);
+      const url = await getAvatarSignedUrl(path);
+      setAvatarPath(path);
       setAvatarUrl(url);
       Alert.alert('Avatar uploaded', 'Your profile image is ready to save.');
     } catch (error) {
@@ -84,7 +146,7 @@ export default function ProfileScreen() {
       id: user.id,
       username: username.trim(),
       display_name: displayName.trim() || user.email?.split('@')[0] || 'BRITUME User',
-      avatar_url: avatarUrl ?? '',
+      avatar_path: avatarPath,
       phone: user.user_metadata?.phone ?? null,
     });
 
@@ -96,6 +158,7 @@ export default function ProfileScreen() {
     }
 
     setProfile(profileData);
+    setAvatarPath(profileData.avatar_path);
     Alert.alert('Profile saved', 'Your BRITUME identity has been updated.');
   };
 
@@ -110,7 +173,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.kicker}>BRITUME • PROFILE</Text>
-      <Text style={styles.title}>Create your BRITUME identity</Text>
+      <Text style={styles.title}>Your BRITUME identity</Text>
 
       <View style={styles.avatarBox}>
         {avatarUrl ? (

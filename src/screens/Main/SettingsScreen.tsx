@@ -2,14 +2,65 @@ import React from 'react';
 import {
   Alert,
   Button,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../../../lib/supabase';
+import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
 
-export default function SettingsScreen() {
+type SettingsNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'SETTINGS'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+const settingsSections = [
+  {
+    title: 'Account',
+    body: 'Edit your username, display name, and avatar.',
+    route: 'PROFILE',
+  },
+  {
+    title: 'Security',
+    body: 'Set or change your app PIN and use device biometrics.',
+    route: 'Security',
+  },
+  {
+    title: 'Privacy',
+    body: 'Visibility and data controls are not built yet.',
+  },
+  {
+    title: 'Notifications',
+    body: 'Notification preferences are not built yet.',
+  },
+  {
+    title: 'Appearance / Themes',
+    body: 'Theme controls are not built yet.',
+  },
+  {
+    title: 'Language',
+    body: 'Language selection is not built yet.',
+  },
+  {
+    title: 'Storage',
+    body: 'Storage usage and media management are not built yet.',
+  },
+  {
+    title: 'About BRITUME',
+    body: 'App information and support details are not built yet.',
+  },
+] as const;
+
+export default function SettingsScreen({
+  navigation,
+}: {
+  navigation: SettingsNavigationProp;
+}) {
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -25,45 +76,41 @@ export default function SettingsScreen() {
       <Text style={styles.kicker}>BRITUME • SETTINGS</Text>
       <Text style={styles.title}>Control center</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <Text style={styles.sectionBody}>Profile, email, password, account details.</Text>
-      </View>
+      {settingsSections.map((section) => {
+        const implemented = 'route' in section;
+        const onPress = () => {
+          if (!implemented) {
+            return;
+          }
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
-        <Text style={styles.sectionBody}>App lock, passcode, biometrics, protection.</Text>
-      </View>
+          if (section.route === 'PROFILE') {
+            navigation.navigate('PROFILE');
+          } else {
+            navigation.navigate('Security');
+          }
+        };
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy</Text>
-        <Text style={styles.sectionBody}>Control visibility and personal data access.</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <Text style={styles.sectionBody}>Alerts, messages, and personal updates.</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Appearance / Themes</Text>
-        <Text style={styles.sectionBody}>Dark mode, visual themes, premium UI styling.</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Language</Text>
-        <Text style={styles.sectionBody}>Choose your BRITUME language.</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Storage</Text>
-        <Text style={styles.sectionBody}>Profile media, backups, and account storage usage.</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About BRITUME</Text>
-        <Text style={styles.sectionBody}>BRITUME version, app overview, and developer info.</Text>
-      </View>
+        return (
+          <Pressable
+            key={section.title}
+            accessibilityRole={implemented ? 'button' : undefined}
+            accessibilityState={{ disabled: !implemented }}
+            disabled={!implemented}
+            onPress={onPress}
+            style={({ pressed }) => [
+              styles.section,
+              pressed && implemented && styles.sectionPressed,
+              !implemented && styles.sectionDisabled,
+            ]}
+          >
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              {!implemented && <Text style={styles.comingSoon}>COMING SOON</Text>}
+            </View>
+            <Text style={styles.sectionBody}>{section.body}</Text>
+          </Pressable>
+        );
+      })}
 
       <View style={styles.signOutWrap}>
         <Button title="Sign out" onPress={signOut} />
@@ -98,10 +145,29 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
   },
+  sectionPressed: {
+    borderColor: '#d9b867',
+    opacity: 0.8,
+  },
+  sectionDisabled: {
+    opacity: 0.72,
+  },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   sectionTitle: {
     color: '#f4f6fa',
     fontSize: 16,
     fontWeight: '700',
+  },
+  comingSoon: {
+    color: '#8f9aab',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   sectionBody: {
     color: '#c5ccd7',

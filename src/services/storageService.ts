@@ -17,14 +17,7 @@ export async function uploadAvatar(fileUri: string, userId: string) {
     throw error;
   }
 
-  // Use signed URL for private bucket (1 hour expiry = 3600 seconds)
-  const { data, error: signedUrlError } = await supabase.storage
-    .from('avatars')
-    .createSignedUrl(fileName, 60 * 60);
-
-  if (signedUrlError) {
-    throw signedUrlError;
-  }
-
-  return data.signedUrl;
+  // Persist only this stable object path. The UI requests a fresh signed URL
+  // whenever it needs to display the private avatar.
+  return fileName;
 }

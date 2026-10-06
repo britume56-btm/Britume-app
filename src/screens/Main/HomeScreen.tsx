@@ -1,22 +1,21 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BRITUME_SECTIONS } from '../../constants/sections';
+import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
 
-const BRITUME_SECTIONS = [
-  'LIVING',
-  'SOCIAL',
-  'CHAT',
-  'GAMES',
-  'TECHNOLOGIES',
-  'TV',
-  'STUDIOS',
-  'WEAR',
-  'LABS',
-  'THEMES',
-  'GALLERY',
-  'SECURITY',
-];
+type HomeNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'LIVING'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
-export default function HomeScreen() {
+export default function HomeScreen({
+  navigation,
+}: {
+  navigation: HomeNavigationProp;
+}) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.kicker}>BRITUME • ONE APP</Text>
@@ -26,11 +25,32 @@ export default function HomeScreen() {
       </Text>
 
       <View style={styles.grid}>
-        {BRITUME_SECTIONS.map((section) => (
-          <View key={section} style={styles.tile}>
-            <Text style={styles.tileText}>{section}</Text>
-          </View>
-        ))}
+        {BRITUME_SECTIONS.map((section) => {
+          const onPress = () => {
+            if (section.name === 'SETTINGS') {
+              navigation.navigate('SETTINGS');
+            } else if (section.name === 'SECURITY') {
+              navigation.navigate('Security');
+            } else if (section.name === 'LIVING') {
+              navigation.navigate('LIVING');
+            } else {
+              navigation.navigate('Module', { section: section.name });
+            }
+          };
+
+          return (
+            <Pressable
+              key={section.name}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${section.name}`}
+              onPress={onPress}
+              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+            >
+              <Text style={styles.tileIcon}>{section.icon}</Text>
+              <Text style={styles.tileText}>{section.name}</Text>
+            </Pressable>
+          );
+        })}
       </View>
     </ScrollView>
   );
@@ -77,6 +97,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 90,
+  },
+  tilePressed: {
+    opacity: 0.75,
+    borderColor: '#d9b867',
+  },
+  tileIcon: {
+    color: '#d9b867',
+    fontSize: 21,
+    marginBottom: 6,
   },
   tileText: {
     color: '#f4f6fa',

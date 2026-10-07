@@ -16,7 +16,9 @@ BRITUME is an Expo + React Native + TypeScript app backed by Supabase. This repo
 🟡 **TV, TECHNOLOGIES, STUDIOS, WEAR, and FOUNDATION have authenticated, searchable community posts**
 🟡 **TV supports direct video playback and on-device downloads for direct MP4 links**
 🟡 **SETTINGS links account/security, reports and clears offline video storage, and shows the app version**
-🟡 **Other unbuilt modules remain clearly marked as not built yet**
+🟡 **GAMES, THEMES, GALLERY, NOTIFICATIONS, PREMIUM, and LABS have launch-focused screens**
+🟡 **Custom themes and notification preferences save to the signed-in account after the new migration is applied**
+🟡 **Ads, rewarded unlocks, and purchases are provider-ready placeholders only**
 ✅ **TypeScript strict mode**
 
 ## Quick Start
@@ -45,6 +47,9 @@ npm install
 9. Apply `supabase/migrations/20261007100000_content_sections.sql` after the
    SOCIAL + CHAT migration for the TV, TECHNOLOGIES, STUDIOS, WEAR, and
    FOUNDATION feeds.
+10. Apply `supabase/migrations/20261007150000_launch_features.sql` for account
+    theme/preferences, in-app notifications, read-only premium entitlements,
+    and private theme-background storage.
 
 For an **existing** database that still has `profiles.avatar_url`, run
 `supabase/migrations/20261005000000_profile_avatar_paths.sql` before deploying
@@ -56,11 +61,12 @@ applies it to a Supabase project. This work did not connect to or change a live
 Supabase database. The migration creates public-safe profile data, follows,
 posts, likes, comments, direct conversations, messages, read markers, and
 per-user message hides, with RLS enabled. Public profile data deliberately
-excludes phone numbers and private avatar paths. No media bucket or push
-notification setup is included in this phase.
-The content-section migration is also a repository file until an administrator
-applies it. Privacy controls, push notification delivery, appearance selection,
-and language selection remain outside this launch upgrade.
+excludes phone numbers and private avatar paths. No push-notification provider
+or device-token setup is included in this phase.
+These migrations are repository files until an administrator applies them to
+the target Supabase project. Push delivery still needs a push provider and
+device tokens; the in-app notification list and preference controls do not
+send push messages.
 
 Only the public Supabase URL and publishable/anon key belong in the app. Values
 prefixed with `EXPO_PUBLIC_` are bundled into the client and are **not secrets**;
@@ -179,10 +185,10 @@ src/
    then smoke-test authentication, feeds, and RLS with separate accounts.
 2. Link the app to EAS, create the internal Android APK, and test auth/deep links,
    the app lock, video playback/downloads, and storage cleanup on a device.
-3. Finish account recovery/password changes and implement privacy/data controls,
-   push-notification delivery, appearance, and language settings.
-4. Continue the remaining unbuilt sections (including LABS, THEMES, and GALLERY).
-   PREMIUM and GAMES were intentionally excluded from this upgrade.
+3. Finish account recovery/password changes and privacy/data controls.
+4. Configure a billing provider and trusted entitlement webhook before
+   enabling purchases. Connect an ad provider before showing ads or offering
+   rewarded unlocks. Neither service is configured by this upgrade.
 
 ## Notes
 

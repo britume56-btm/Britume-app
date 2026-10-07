@@ -12,30 +12,38 @@ import PublicProfileScreen from '../screens/Social/PublicProfileScreen';
 import FollowListScreen from '../screens/Social/FollowListScreen';
 import ChatScreen from '../screens/Chat/ChatScreen';
 import ConversationScreen from '../screens/Chat/ConversationScreen';
+import GamesScreen from '../screens/Main/GamesScreen';
+import ThemesScreen from '../screens/Main/ThemesScreen';
+import GalleryScreen from '../screens/Main/GalleryScreen';
+import NotificationsScreen from '../screens/Main/NotificationsScreen';
+import PremiumScreen from '../screens/Main/PremiumScreen';
+import LabsScreen from '../screens/Main/LabsScreen';
+import { useAppTheme } from '../theme/AppThemeContext';
 import type { MainTabParamList, RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function MainTabs() {
+  const { palette } = useAppTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: '#070b12',
+          backgroundColor: palette.background,
         },
-        headerTintColor: '#f4f6fa',
+        headerTintColor: palette.text,
         headerTitleStyle: {
           fontWeight: '800',
         },
         tabBarStyle: {
-          backgroundColor: '#101722',
-          borderTopColor: '#263247',
+          backgroundColor: palette.surface,
+          borderTopColor: palette.border,
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: '#d9b867',
-        tabBarInactiveTintColor: '#8f9aab',
+        tabBarActiveTintColor: palette.accent,
+        tabBarInactiveTintColor: palette.muted,
       }}
     >
       <Tab.Screen name="LIVING" component={HomeScreen} options={{ title: 'LIVING' }} />
@@ -46,14 +54,15 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
+  const { palette } = useAppTheme();
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: { backgroundColor: '#070b12' },
-          headerTintColor: '#f4f6fa',
+          headerStyle: { backgroundColor: palette.background },
+          headerTintColor: palette.text,
           headerTitleStyle: { fontWeight: '800' },
-          contentStyle: { backgroundColor: '#070b12' },
+          contentStyle: { backgroundColor: palette.background },
         }}
       >
         <Stack.Screen
@@ -98,6 +107,16 @@ export default function AppNavigator() {
           component={AppLockScreen}
           options={{ title: 'APP LOCK' }}
         />
+        <Stack.Screen name="Games" component={GamesScreen} options={{ title: 'GAMES' }} />
+        <Stack.Screen name="Themes" component={ThemesScreen} options={{ title: 'THEMES' }} />
+        <Stack.Screen name="Gallery" component={GalleryScreen} options={{ title: 'GALLERY' }} />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: 'NOTIFICATIONS' }}
+        />
+        <Stack.Screen name="Premium" component={PremiumScreen} options={{ title: 'PREMIUM' }} />
+        <Stack.Screen name="Labs" component={LabsScreen} options={{ title: 'LABS' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

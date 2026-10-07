@@ -11,6 +11,8 @@ export const BRITUME_SECTIONS = [
   { name: 'LABS', icon: '◐' },
   { name: 'THEMES', icon: '◑' },
   { name: 'GALLERY', icon: '◐' },
+  { name: 'NOTIFICATIONS', icon: '◌' },
+  { name: 'PREMIUM', icon: '✧' },
   { name: 'SECURITY', icon: '◒' },
   { name: 'SETTINGS', icon: '⚙' },
 ] as const;

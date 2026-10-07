@@ -20,4 +20,10 @@ export type RootStackParamList = {
   PublicProfile: { userId: string };
   FollowList: { userId: string; kind: 'followers' | 'following' };
   Security: undefined;
+  Games: undefined;
+  Themes: { backgroundUri?: string } | undefined;
+  Gallery: { selectForTheme?: boolean } | undefined;
+  Notifications: undefined;
+  Premium: undefined;
+  Labs: undefined;
 };

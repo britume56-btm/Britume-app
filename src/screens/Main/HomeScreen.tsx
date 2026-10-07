@@ -1,10 +1,11 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BRITUME_SECTIONS } from '../../constants/sections';
 import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import { useAppTheme } from '../../theme/AppThemeContext';
 
 type HomeNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'LIVING'>,
@@ -16,11 +17,17 @@ export default function HomeScreen({
 }: {
   navigation: HomeNavigationProp;
 }) {
+  const { palette, backgroundUri } = useAppTheme();
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.kicker}>BRITUME • ONE APP</Text>
-      <Text style={styles.title}>Your BRITUME ecosystem</Text>
-      <Text style={styles.body}>
+    <ImageBackground
+      source={backgroundUri ? { uri: backgroundUri } : undefined}
+      imageStyle={styles.wallpaper}
+      style={[styles.background, { backgroundColor: palette.background }]}
+    >
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: backgroundUri ? 'transparent' : palette.background }]}>
+      <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • ONE APP</Text>
+      <Text style={[styles.title, { color: palette.text }]}>Your BRITUME ecosystem</Text>
+      <Text style={[styles.body, { color: palette.muted }]}>
         One unified app for living, social, media, creativity, technology, and growth.
       </Text>
 
@@ -37,6 +44,18 @@ export default function HomeScreen({
               navigation.navigate('Social');
             } else if (section.name === 'CHAT') {
               navigation.navigate('Chat');
+            } else if (section.name === 'GAMES') {
+              navigation.navigate('Games');
+            } else if (section.name === 'THEMES') {
+              navigation.navigate('Themes');
+            } else if (section.name === 'GALLERY') {
+              navigation.navigate('Gallery');
+            } else if (section.name === 'NOTIFICATIONS') {
+              navigation.navigate('Notifications');
+            } else if (section.name === 'PREMIUM') {
+              navigation.navigate('Premium');
+            } else if (section.name === 'LABS') {
+              navigation.navigate('Labs');
             } else {
               navigation.navigate('Module', { section: section.name });
             }
@@ -48,19 +67,26 @@ export default function HomeScreen({
               accessibilityRole="button"
               accessibilityLabel={`Open ${section.name}`}
               onPress={onPress}
-              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+              style={({ pressed }) => [
+                styles.tile,
+                { backgroundColor: palette.surface, borderColor: palette.border },
+                pressed && { borderColor: palette.accent, opacity: 0.75 },
+              ]}
             >
-              <Text style={styles.tileIcon}>{section.icon}</Text>
-              <Text style={styles.tileText}>{section.name}</Text>
+              <Text style={[styles.tileIcon, { color: palette.accent }]}>{section.icon}</Text>
+              <Text style={[styles.tileText, { color: palette.text }]}>{section.name}</Text>
             </Pressable>
           );
         })}
       </View>
     </ScrollView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  background: { flex: 1 },
+  wallpaper: { opacity: 0.62 },
   container: {
     padding: 20,
     backgroundColor: '#070b12',
@@ -101,10 +127,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 90,
-  },
-  tilePressed: {
-    opacity: 0.75,
-    borderColor: '#d9b867',
   },
   tileIcon: {
     color: '#d9b867',

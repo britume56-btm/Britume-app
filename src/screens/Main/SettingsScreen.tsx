@@ -18,6 +18,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../../../lib/supabase';
 import { formatStorageSize, OFFLINE_VIDEO_KEY_PREFIX } from '../../services/contentRules.mjs';
 import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import { useAppTheme } from '../../theme/AppThemeContext';
 
 type SettingsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'SETTINGS'>,
@@ -41,11 +42,18 @@ const settingsSections = [
   },
   {
     title: 'Notifications',
-    body: 'Notification preferences are not built yet.',
+    body: 'Read notifications and manage in-app preferences.',
+    route: 'Notifications',
   },
   {
     title: 'Appearance / Themes',
-    body: 'Theme controls are not built yet.',
+    body: 'Choose an app theme or create a custom one.',
+    route: 'Themes',
+  },
+  {
+    title: 'Premium',
+    body: 'View your account entitlement and future member benefits.',
+    route: 'Premium',
   },
   {
     title: 'Language',
@@ -66,6 +74,7 @@ export default function SettingsScreen({
 }: {
   navigation: SettingsNavigationProp;
 }) {
+  const { palette } = useAppTheme();
   const [offlineCount, setOfflineCount] = useState(0);
   const [offlineBytes, setOfflineBytes] = useState(0);
   const [storageLoading, setStorageLoading] = useState(true);
@@ -166,16 +175,16 @@ export default function SettingsScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.kicker}>BRITUME • SETTINGS</Text>
-      <Text style={styles.title}>Control center</Text>
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: palette.background }]}>
+      <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • SETTINGS</Text>
+      <Text style={[styles.title, { color: palette.text }]}>Control center</Text>
 
       {settingsSections.map((section) => {
         if (section.title === 'Storage') {
           return (
             <View key={section.title} style={styles.section}>
-              <Text style={styles.sectionTitle}>Storage</Text>
-              <Text style={styles.sectionBody}>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>Storage</Text>
+              <Text style={[styles.sectionBody, { color: palette.muted }]}>
                 {storageLoading
                   ? 'Checking offline videos…'
                   : `${offlineCount} offline video${offlineCount === 1 ? '' : 's'} · ${formatStorageSize(offlineBytes)}`}
@@ -199,9 +208,9 @@ export default function SettingsScreen({
         if (section.title === 'About BRITUME') {
           return (
             <View key={section.title} style={styles.section}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-              <Text style={styles.sectionBody}>{section.body}</Text>
-              <Text style={styles.sectionBody}>Version {appConfig.expo.version}</Text>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>{section.title}</Text>
+              <Text style={[styles.sectionBody, { color: palette.muted }]}>{section.body}</Text>
+              <Text style={[styles.sectionBody, { color: palette.muted }]}>Version {appConfig.expo.version}</Text>
             </View>
           );
         }
@@ -214,8 +223,14 @@ export default function SettingsScreen({
 
           if (section.route === 'PROFILE') {
             navigation.navigate('PROFILE');
-          } else {
+          } else if (section.route === 'Security') {
             navigation.navigate('Security');
+          } else if (section.route === 'Notifications') {
+            navigation.navigate('Notifications');
+          } else if (section.route === 'Themes') {
+            navigation.navigate('Themes');
+          } else if (section.route === 'Premium') {
+            navigation.navigate('Premium');
           }
         };
 
@@ -228,15 +243,16 @@ export default function SettingsScreen({
             onPress={onPress}
             style={({ pressed }) => [
               styles.section,
+              { backgroundColor: palette.surface, borderColor: palette.border },
               pressed && implemented && styles.sectionPressed,
               !implemented && styles.sectionDisabled,
             ]}
           >
             <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>{section.title}</Text>
               {!implemented && <Text style={styles.comingSoon}>COMING SOON</Text>}
             </View>
-            <Text style={styles.sectionBody}>{section.body}</Text>
+            <Text style={[styles.sectionBody, { color: palette.muted }]}>{section.body}</Text>
           </Pressable>
         );
       })}

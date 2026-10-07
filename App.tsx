@@ -7,6 +7,7 @@ import AuthGate from './src/screens/Auth/AuthGate';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AppLockProvider, useAppLock } from './src/security/AppLockContext';
 import AppLockScreen from './src/screens/Security/AppLockScreen';
+import { AppThemeProvider } from './src/theme/AppThemeContext';
 
 const prefix = Linking.createURL('/');
 
@@ -147,8 +148,10 @@ export default function App() {
   }
 
   return (
-    <AppLockProvider key={session.user.id} userId={session.user.id}>
-      <AuthenticatedApp />
-    </AppLockProvider>
+    <AppThemeProvider userId={session.user.id}>
+      <AppLockProvider key={session.user.id} userId={session.user.id}>
+        <AuthenticatedApp />
+      </AppLockProvider>
+    </AppThemeProvider>
   );
 }

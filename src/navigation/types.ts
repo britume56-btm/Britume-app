@@ -11,6 +11,13 @@ type BritumeSection = (typeof BRITUME_SECTIONS)[number]['name'];
 
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
-  Module: { section: Exclude<BritumeSection, 'LIVING' | 'SETTINGS'> };
+  Module: {
+    section: Exclude<BritumeSection, 'LIVING' | 'SETTINGS' | 'SOCIAL' | 'CHAT'>;
+  };
+  Social: undefined;
+  Chat: undefined;
+  Conversation: { conversationId: string; partnerId: string };
+  PublicProfile: { userId: string };
+  FollowList: { userId: string; kind: 'followers' | 'following' };
   Security: undefined;
 };

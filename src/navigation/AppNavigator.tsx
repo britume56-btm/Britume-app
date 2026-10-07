@@ -7,6 +7,11 @@ import ProfileScreen from '../screens/Main/ProfileScreen';
 import SettingsScreen from '../screens/Main/SettingsScreen';
 import ModuleScreen from '../screens/Main/ModuleScreen';
 import AppLockScreen from '../screens/Security/AppLockScreen';
+import SocialScreen from '../screens/Social/SocialScreen';
+import PublicProfileScreen from '../screens/Social/PublicProfileScreen';
+import FollowListScreen from '../screens/Social/FollowListScreen';
+import ChatScreen from '../screens/Chat/ChatScreen';
+import ConversationScreen from '../screens/Chat/ConversationScreen';
 import type { MainTabParamList, RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -60,6 +65,33 @@ export default function AppNavigator() {
           name="Module"
           component={ModuleScreen}
           options={({ route }) => ({ title: route.params.section })}
+        />
+        <Stack.Screen
+          name="Social"
+          component={SocialScreen}
+          options={{ title: 'SOCIAL' }}
+        />
+        <Stack.Screen
+          name="PublicProfile"
+          component={PublicProfileScreen}
+          options={{ title: 'PROFILE' }}
+        />
+        <Stack.Screen
+          name="FollowList"
+          component={FollowListScreen}
+          options={({ route }) => ({
+            title: route.params.kind === 'followers' ? 'FOLLOWERS' : 'FOLLOWING',
+          })}
+        />
+        <Stack.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={{ title: 'CHAT' }}
+        />
+        <Stack.Screen
+          name="Conversation"
+          component={ConversationScreen}
+          options={{ title: 'CHAT' }}
         />
         <Stack.Screen
           name="Security"

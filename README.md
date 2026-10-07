@@ -13,7 +13,9 @@ BRITUME is an Expo + React Native + TypeScript app backed by Supabase. This repo
 ✅ **BRITUME section tiles navigate to their section screens**
 ✅ **SecureStore PIN setup, change, verification, and app-resume locking**
 ✅ **Device biometrics through Expo Local Authentication**
-🟡 **Account and Security settings work; other settings and BRITUME modules are clearly marked as not built yet**
+🟡 **TV, TECHNOLOGIES, STUDIOS, WEAR, and FOUNDATION have authenticated, searchable community posts**
+🟡 **TV supports direct video playback and on-device downloads for direct MP4 links**
+🟡 **Other unbuilt modules remain clearly marked as not built yet**
 ✅ **TypeScript strict mode**
 
 ## Quick Start
@@ -82,7 +84,11 @@ Then:
 8. **Open CHAT** — search for a profile, start a one-to-one conversation, send
    messages from both accounts, check unread state, and remove a sent message
    from one account's history
-9. **Sign out** from SETTINGS
+9. Apply `supabase/migrations/20261007100000_content_sections.sql` after the
+   SOCIAL + CHAT migration, then test posting and searching in TV,
+   TECHNOLOGIES, STUDIOS, WEAR, and FOUNDATION. TV offline downloads support
+   direct MP4 links; HLS links stream but are not downloaded for offline use.
+10. **Sign out** from SETTINGS
 
 ## SOCIAL + CHAT database tests
 
@@ -108,7 +114,7 @@ src/
       AuthGate.tsx       # Welcome, Sign up, Sign in screens
     Main/
       HomeScreen.tsx     # Navigable BRITUME section tiles
-        ModuleScreen.tsx   # Honest placeholder for modules not built yet
+      ModuleScreen.tsx   # Searchable posts for launch content sections
       ProfileScreen.tsx  # Profile + avatar upload
       SettingsScreen.tsx # Profile/security routes and sign out
       Social/
@@ -128,6 +134,7 @@ src/
   services/
     authService.ts       # Auth helpers
     profileService.ts    # Profile CRUD
+    moduleContentService.ts # TV, TECHNOLOGIES, STUDIOS, WEAR, FOUNDATION posts
     socialService.ts     # Public profiles, follows, feed, posts, comments
     chatService.ts       # Direct conversations, messages, read state
     storageService.ts    # Private avatar upload (returns object path)

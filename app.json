@@ -12,7 +12,8 @@
         {
           "faceIDPermission": "BRITUME uses Face ID to keep your account secure."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "android": {
       "package": "com.britume.app",

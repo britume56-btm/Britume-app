@@ -7,6 +7,7 @@ export const BRITUME_SECTIONS = [
   { name: 'TV', icon: '▣' },
   { name: 'STUDIOS', icon: '◌' },
   { name: 'WEAR', icon: '◍' },
+  { name: 'FOUNDATION', icon: '◇' },
   { name: 'LABS', icon: '◐' },
   { name: 'THEMES', icon: '◑' },
   { name: 'GALLERY', icon: '◐' },

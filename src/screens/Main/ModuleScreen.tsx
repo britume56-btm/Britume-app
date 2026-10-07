@@ -21,15 +21,22 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../../lib/supabase';
 import type { RootStackParamList } from '../../navigation/types';
 import {
+  isModuleContentSection,
+  isOfflineVideoUrl,
+  isPlayableVideoUrl,
+  matchesModulePost,
+  OFFLINE_VIDEO_KEY_PREFIX,
+} from '../../services/contentRules.mjs';
+import {
   createModulePost,
   deleteModulePost,
   listModulePosts,
   type ModulePost,
+  type ModuleSection,
 } from '../../services/moduleContentService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Module'>;
-type ReadySection = 'TV' | 'TECHNOLOGIES' | 'STUDIOS' | 'WEAR' | 'FOUNDATION';
-const OFFLINE_KEY = 'britume:offline-tv:';
+type ReadySection = ModuleSection;
 
 const sectionCopy: Record<ReadySection, { title: string; intro: string; add: string }> = {
   TV: {
@@ -58,10 +65,6 @@ const sectionCopy: Record<ReadySection, { title: string; intro: string; add: str
     add: 'Share an update',
   },
 };
-
-function isReadySection(section: string): section is ReadySection {
-  return ['TV', 'TECHNOLOGIES', 'STUDIOS', 'WEAR', 'FOUNDATION'].includes(section);
-}
 
 function VideoPost({
   source,
@@ -97,10 +100,10 @@ export default function ModuleScreen({ route }: Props) {
   const [body, setBody] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [priceLabel, setPriceLabel] = useState('');
-  const copy = isReadySection(section) ? sectionCopy[section] : null;
+  const copy = isModuleContentSection(section) ? sectionCopy[section] : null;
 
   const loadPosts = useCallback(async () => {
-    if (!copy || !isReadySection(section)) {
+    if (!copy || !isModuleContentSection(section)) {
       setLoading(false);
       return;
     }
@@ -112,7 +115,7 @@ export default function ModuleScreen({ route }: Props) {
       if (section === 'TV') {
         const entries = await Promise.all(
           rows.map(async (post) => {
-            const uri = await AsyncStorage.getItem(`${OFFLINE_KEY}${post.id}`);
+            const uri = await AsyncStorage.getItem(`${OFFLINE_VIDEO_KEY_PREFIX}${post.id}`);
             if (uri && new File(uri).exists) {
               return [post.id, uri] as const;
             }
@@ -135,13 +138,7 @@ export default function ModuleScreen({ route }: Props) {
   );
 
   const visiblePosts = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase();
-    if (!needle) {
-      return posts;
-    }
-    return posts.filter((post) =>
-      `${post.title} ${post.body} ${post.price_label ?? ''}`.toLocaleLowerCase().includes(needle)
-    );
+    return posts.filter((post) => matchesModulePost(post, query));
   }, [posts, query]);
 
   function resetComposer() {
@@ -153,7 +150,7 @@ export default function ModuleScreen({ route }: Props) {
   }
 
   async function publishPost() {
-    if (!copy || !isReadySection(section) || saving) {
+    if (!copy || !isModuleContentSection(section) || saving) {
       return;
     }
     setSaving(true);
@@ -193,7 +190,7 @@ export default function ModuleScreen({ route }: Props) {
   }
 
   async function saveOffline(post: ModulePost) {
-    if (!post.media_url || !/\.mp4(?:$|[?#])/i.test(post.media_url)) {
+    if (!post.media_url || !isOfflineVideoUrl(post.media_url)) {
       Alert.alert('MP4 link required', 'Offline saving currently supports direct MP4 video links.');
       return;
     }
@@ -206,7 +203,7 @@ export default function ModuleScreen({ route }: Props) {
         new File(folder, `${post.id}.mp4`),
         { idempotent: true }
       );
-      await AsyncStorage.setItem(`${OFFLINE_KEY}${post.id}`, downloaded.uri);
+      await AsyncStorage.setItem(`${OFFLINE_VIDEO_KEY_PREFIX}${post.id}`, downloaded.uri);
       setOfflineUris((current) => ({ ...current, [post.id]: downloaded.uri }));
     } catch (cause) {
       Alert.alert(
@@ -274,7 +271,7 @@ export default function ModuleScreen({ route }: Props) {
         ) : (
           visiblePosts.map((post) => {
             const videoUrl = post.media_url ?? '';
-            const isVideoFile = /\.(mp4|m3u8|mov)(?:$|[?#])/i.test(videoUrl);
+            const isVideoFile = isPlayableVideoUrl(videoUrl);
             const playableSource = offlineUris[post.id] ?? videoUrl;
             return (
               <View key={post.id} style={styles.postCard}>
@@ -305,7 +302,7 @@ export default function ModuleScreen({ route }: Props) {
                     >
                       <Text style={styles.linkButtonText}>Watch video</Text>
                     </Pressable>
-                    {Platform.OS !== 'web' && /\.mp4(?:$|[?#])/i.test(videoUrl) ? (
+                    {Platform.OS !== 'web' && isOfflineVideoUrl(videoUrl) ? (
                       <Pressable
                         accessibilityRole="button"
                         disabled={downloadingId === post.id}

@@ -1,6 +1,11 @@
 import { supabase } from '../../lib/supabase';
+import {
+  OFFLINE_VIDEO_KEY_PREFIX,
+  validateModulePostDraft,
+} from './contentRules.mjs';
+import type { ModuleSection } from './contentRules.mjs';
 
-export type ModuleSection = 'TV' | 'TECHNOLOGIES' | 'STUDIOS' | 'WEAR' | 'FOUNDATION';
+export type { ModuleSection } from './contentRules.mjs';
 
 export type ModulePost = {
   id: string;
@@ -68,11 +73,15 @@ export async function createModulePost(input: {
   }
 
   const mediaUrl = input.mediaUrl.trim();
-  if (mediaUrl && !/^https?:\/\//i.test(mediaUrl)) {
-    throw new Error('Links must start with https:// or http://.');
-  }
-  if (input.section === 'TV' && !mediaUrl) {
-    throw new Error('Add a direct MP4 or HLS video link to publish a TV post.');
+  const validationError = validateModulePostDraft({
+    section: input.section,
+    title: input.title,
+    body: input.body,
+    mediaUrl,
+    priceLabel: input.priceLabel,
+  });
+  if (validationError) {
+    throw new Error(validationError);
   }
 
   const { error } = await supabase.from('module_posts').insert({

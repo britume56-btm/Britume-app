@@ -15,6 +15,7 @@ BRITUME is an Expo + React Native + TypeScript app backed by Supabase. This repo
 ✅ **Device biometrics through Expo Local Authentication**
 🟡 **TV, TECHNOLOGIES, STUDIOS, WEAR, and FOUNDATION have authenticated, searchable community posts**
 🟡 **TV supports direct video playback and on-device downloads for direct MP4 links**
+🟡 **SETTINGS links account/security, reports and clears offline video storage, and shows the app version**
 🟡 **Other unbuilt modules remain clearly marked as not built yet**
 ✅ **TypeScript strict mode**
 
@@ -41,6 +42,9 @@ npm install
    Phase 1 SOCIAL + CHAT, apply
    `supabase/migrations/20261007060000_social_chat_phase1.sql` after the
    profile foundation is present.
+9. Apply `supabase/migrations/20261007100000_content_sections.sql` after the
+   SOCIAL + CHAT migration for the TV, TECHNOLOGIES, STUDIOS, WEAR, and
+   FOUNDATION feeds.
 
 For an **existing** database that still has `profiles.avatar_url`, run
 `supabase/migrations/20261005000000_profile_avatar_paths.sql` before deploying
@@ -54,13 +58,16 @@ posts, likes, comments, direct conversations, messages, read markers, and
 per-user message hides, with RLS enabled. Public profile data deliberately
 excludes phone numbers and private avatar paths. No media bucket or push
 notification setup is included in this phase.
+The content-section migration is also a repository file until an administrator
+applies it. Privacy controls, push notification delivery, appearance selection,
+and language selection remain outside this launch upgrade.
 
 Only the public Supabase URL and publishable/anon key belong in the app. Values
 prefixed with `EXPO_PUBLIC_` are bundled into the client and are **not secrets**;
 never put a Supabase `service_role` key in the app, `.env.example`, or source
 control.
 
-### 5. Start the App
+### 3. Start the App
 
 ```bash
 npm start
@@ -78,7 +85,8 @@ Then:
 3. **Click the link** — it will deep-link to the app and sign you in
 4. **Go to PROFILE** — upload an avatar, set your display name
 5. **Set a PIN** from SETTINGS → Security, then background and reopen the app to verify the lock
-6. **Explore section tiles** — unfinished modules open an explicit foundation screen
+6. **Explore section tiles** — open the TV, TECHNOLOGIES, STUDIOS, WEAR, and
+   FOUNDATION content areas
 7. **Open SOCIAL** — create/edit/delete a post, search profiles, follow someone,
    like a post, add a comment, and view follower/following lists
 8. **Open CHAT** — search for a profile, start a one-to-one conversation, send
@@ -105,6 +113,22 @@ follow/post ownership, idempotent direct conversations, member-only message
 access, per-user message hiding, and read/unread behavior. Do not point
 `TEST_DATABASE_URL` at production.
 
+## Lightweight checks
+
+```bash
+npm test
+npm run typecheck
+npx expo install --check
+```
+
+## Android builds
+
+`eas.json` includes an internal APK profile for device testing and an Android
+App Bundle profile for a later Play Console upload. Configure/link the app with
+EAS and its Android signing credentials before running `eas build`; these build
+profiles do not publish the app. Increase `android.versionCode` in `app.json`
+for each Play Console release.
+
 ## Project Structure
 
 ```
@@ -116,7 +140,7 @@ src/
       HomeScreen.tsx     # Navigable BRITUME section tiles
       ModuleScreen.tsx   # Searchable posts for launch content sections
       ProfileScreen.tsx  # Profile + avatar upload
-      SettingsScreen.tsx # Profile/security routes and sign out
+       SettingsScreen.tsx # Account/security, offline storage, app info, sign out
       Social/
         SocialScreen.tsx       # Feed, discovery, post actions
         PublicProfileScreen.tsx
@@ -135,6 +159,7 @@ src/
     authService.ts       # Auth helpers
     profileService.ts    # Profile CRUD
     moduleContentService.ts # TV, TECHNOLOGIES, STUDIOS, WEAR, FOUNDATION posts
+    contentRules.mjs      # Tested post validation, search, video, and storage rules
     socialService.ts     # Public profiles, follows, feed, posts, comments
     chatService.ts       # Direct conversations, messages, read state
     storageService.ts    # Private avatar upload (returns object path)
@@ -148,16 +173,16 @@ src/
     profile.ts           # TypeScript profile type
 ```
 
-## Recommended build order
+## Remaining work
 
-1. Finish account recovery and email/password change flows.
-2. Build one well-defined module end to end (recommended: SOCIAL) with its own
-   data model, RLS policies, screens, and tests.
-3. Build CHAT on top of the account/profile foundation, then notifications.
-4. Add privacy controls and data export/delete flows before broader social launch.
-5. Add appearance, language, storage reporting, and About settings.
-6. Continue with GAMES, TECHNOLOGIES, TV, STUDIOS, WEAR, LABS, THEMES, and
-   GALLERY one module at a time; introduce payments only when a module needs them.
+1. Apply and verify the existing Supabase migrations in a non-production project,
+   then smoke-test authentication, feeds, and RLS with separate accounts.
+2. Link the app to EAS, create the internal Android APK, and test auth/deep links,
+   the app lock, video playback/downloads, and storage cleanup on a device.
+3. Finish account recovery/password changes and implement privacy/data controls,
+   push-notification delivery, appearance, and language settings.
+4. Continue the remaining unbuilt sections (including LABS, THEMES, and GALLERY).
+   PREMIUM and GAMES were intentionally excluded from this upgrade.
 
 ## Notes
 

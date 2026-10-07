@@ -33,6 +33,10 @@ export default function HomeScreen({
               navigation.navigate('Security');
             } else if (section.name === 'LIVING') {
               navigation.navigate('LIVING');
+            } else if (section.name === 'SOCIAL') {
+              navigation.navigate('Social');
+            } else if (section.name === 'CHAT') {
+              navigation.navigate('Chat');
             } else {
               navigation.navigate('Module', { section: section.name });
             }

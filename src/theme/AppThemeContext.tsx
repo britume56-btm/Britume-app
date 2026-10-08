@@ -1,6 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { getAccountPreferences, getThemeBackgroundUrl } from '../services/launchFeatureService';
+import {
+  getAccountPreferences,
+  getPremiumEntitlement,
+  getThemeBackgroundUrl,
+  hasPremiumAccess,
+  saveAccountPreferences,
+} from '../services/launchFeatureService';
+import type {
+  LabExperimentId,
+  LabsExperimentSettings,
+} from '../services/launchFeatureService';
 
 export type ThemeId = 'midnight' | 'ocean' | 'dusk' | 'nebula' | 'custom';
 
@@ -51,9 +61,19 @@ export const THEME_PALETTES: Record<Exclude<ThemeId, 'custom'>, ThemePalette> = 
 type AppThemeContextValue = {
   themeId: ThemeId;
   customThemeName: string;
+  customAccentColor: string | null;
   palette: ThemePalette;
   backgroundUri: string | null;
-  applyTheme: (themeId: ThemeId, customThemeName?: string, backgroundUri?: string | null) => void;
+  loading: boolean;
+  loadError: string | null;
+  experiments: LabsExperimentSettings;
+  updateExperiment: (id: LabExperimentId, enabled: boolean) => Promise<void>;
+  applyTheme: (
+    themeId: ThemeId,
+    customThemeName?: string,
+    backgroundUri?: string | null,
+    customAccentColor?: string | null
+  ) => void;
   pendingGalleryBackground: string | null;
   selectGalleryBackground: (uri: string) => void;
   clearPendingGalleryBackground: () => void;
@@ -70,26 +90,61 @@ export function AppThemeProvider({
 }) {
   const [themeId, setThemeId] = useState<ThemeId>('midnight');
   const [customThemeName, setCustomThemeName] = useState('Custom theme');
+  const [customAccentColor, setCustomAccentColor] = useState<string | null>(null);
   const [backgroundUri, setBackgroundUri] = useState<string | null>(null);
   const [pendingGalleryBackground, setPendingGalleryBackground] = useState<string | null>(null);
+  const [experiments, setExperiments] = useState<LabsExperimentSettings>({
+    'focus-mode': false,
+    'compact-home': false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setLoadError(null);
+    setThemeId('midnight');
+    setCustomThemeName('Custom theme');
+    setCustomAccentColor(null);
+    setBackgroundUri(null);
+    setPendingGalleryBackground(null);
+    setExperiments({ 'focus-mode': false, 'compact-home': false });
     void (async () => {
       try {
         const preferences = await getAccountPreferences(userId);
-        const id = preferences.theme_id as ThemeId;
-        const uri = await getThemeBackgroundUrl(preferences.background_path);
+        let id = preferences.theme_id as ThemeId;
+        const uri =
+          id === 'custom' ? await getThemeBackgroundUrl(preferences.background_path) : null;
+        if (id === 'nebula') {
+          const entitlement = await getPremiumEntitlement(userId);
+          if (!hasPremiumAccess(entitlement)) {
+            id = 'midnight';
+          }
+        }
         if (active) {
           if (['midnight', 'ocean', 'dusk', 'nebula', 'custom'].includes(id)) {
             setThemeId(id);
           }
           setCustomThemeName(preferences.custom_theme_name || 'Custom theme');
+          setCustomAccentColor(preferences.custom_accent_color);
           setBackgroundUri(uri);
+          setExperiments(preferences.labs_experiments);
         }
       } catch (error) {
         // A missing launch-feature migration should not prevent sign-in or navigation.
         console.warn('Could not load saved theme preferences:', error);
+        if (active) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : 'Saved BRITUME preferences could not be loaded.'
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -98,23 +153,53 @@ export function AppThemeProvider({
   }, [userId]);
 
   const applyTheme = useCallback(
-    (nextThemeId: ThemeId, nextName = 'Custom theme', nextBackgroundUri: string | null = null) => {
+    (
+      nextThemeId: ThemeId,
+      nextName = 'Custom theme',
+      nextBackgroundUri: string | null = null,
+      nextAccentColor?: string | null
+    ) => {
       setThemeId(nextThemeId);
       setCustomThemeName(nextName);
-      setBackgroundUri(nextBackgroundUri);
+      setBackgroundUri(nextThemeId === 'custom' ? nextBackgroundUri : null);
+      if (nextAccentColor !== undefined) {
+        setCustomAccentColor(nextAccentColor);
+      }
     },
     []
+  );
+  const updateExperiment = useCallback(
+    async (id: LabExperimentId, enabled: boolean) => {
+      const previous = experiments;
+      const next = { ...previous, [id]: enabled };
+      setExperiments(next);
+      try {
+        await saveAccountPreferences(userId, { labs_experiments: next });
+      } catch (error) {
+        setExperiments(previous);
+        throw error;
+      }
+    },
+    [experiments, userId]
   );
   const selectGalleryBackground = useCallback((uri: string) => setPendingGalleryBackground(uri), []);
   const clearPendingGalleryBackground = useCallback(() => setPendingGalleryBackground(null), []);
 
-  const palette = themeId === 'custom' ? THEME_PALETTES.dusk : THEME_PALETTES[themeId];
+  const basePalette = themeId === 'custom' ? THEME_PALETTES.dusk : THEME_PALETTES[themeId];
+  const palette = themeId === 'custom' && customAccentColor
+    ? { ...basePalette, accent: customAccentColor }
+    : basePalette;
   const value = useMemo(
     () => ({
       themeId,
       customThemeName,
+      customAccentColor,
       palette,
       backgroundUri,
+      loading,
+      loadError,
+      experiments,
+      updateExperiment,
       applyTheme,
       pendingGalleryBackground,
       selectGalleryBackground,
@@ -123,8 +208,13 @@ export function AppThemeProvider({
     [
       themeId,
       customThemeName,
+      customAccentColor,
       palette,
       backgroundUri,
+      loading,
+      loadError,
+      experiments,
+      updateExperiment,
       applyTheme,
       pendingGalleryBackground,
       selectGalleryBackground,

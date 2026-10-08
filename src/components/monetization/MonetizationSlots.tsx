@@ -1,30 +1,29 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { areRewardedAdsConfigured } from '../../services/rewardedAdsService';
 
 export function AdSlot({ label = 'Sponsored placement' }: { label?: string }) {
   return (
-    <View accessibilityLabel="Ad placement reserved; advertising is not configured" style={styles.slot}>
-      <Text style={styles.kicker}>{label.toUpperCase()}</Text>
-      <Text style={styles.copy}>This space is reserved for a future ad provider.</Text>
-      <Text style={styles.note}>No ad has been requested, and no earnings are recorded.</Text>
+    <View accessibilityLabel="Display advertising is not configured" style={styles.slot}>
+      <Text style={styles.kicker}>DISPLAY ADS NOT CONFIGURED</Text>
+      <Text style={styles.copy}>
+        {label} is reserved for a production display-ad SDK, placement IDs, and consent flow. No ad is requested.
+      </Text>
+      <Text style={styles.note}>No impressions, earnings, or user data are collected here.</Text>
     </View>
   );
 }
 
 export function RewardedThemeAd() {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: true }}
-      disabled
-      style={styles.reward}
-    >
+    <View accessibilityLabel="Rewarded theme ads are unavailable until a provider is configured" style={styles.reward}>
       <Text style={styles.rewardTitle}>Unlock with a rewarded ad</Text>
       <Text style={styles.copy}>
-        Rewarded ads are unavailable until an ad provider is connected. No unlock or reward has
-        been applied.
+        {areRewardedAdsConfigured()
+          ? 'A rewarded provider is connected, but no theme-unlock reward is enabled. Premium themes still require a verified entitlement.'
+          : 'Unavailable: no real ad provider is configured. No reward is granted from a tap or local state.'}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 

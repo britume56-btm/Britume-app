@@ -34,6 +34,7 @@ import {
   type ModulePost,
   type ModuleSection,
 } from '../../services/moduleContentService';
+import { useAppTheme } from '../../theme/AppThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Module'>;
 type ReadySection = ModuleSection;
@@ -86,6 +87,7 @@ function VideoPost({
 }
 
 export default function ModuleScreen({ route }: Props) {
+  const { palette } = useAppTheme();
   const { section } = route.params;
   const [posts, setPosts] = useState<ModulePost[]>([]);
   const [offlineUris, setOfflineUris] = useState<Record<string, string>>({});
@@ -217,10 +219,10 @@ export default function ModuleScreen({ route }: Props) {
 
   if (!copy) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.kicker}>BRITUME • {section}</Text>
-        <Text style={styles.title}>{section}</Text>
-        <Text style={styles.body}>
+      <View style={[styles.container, { backgroundColor: palette.background }]}>
+        <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • {section}</Text>
+        <Text style={[styles.title, { color: palette.text }]}>{section}</Text>
+        <Text style={[styles.body, { color: palette.muted }]}>
           This section is connected to BRITUME navigation and is not part of this release.
           Your account, profile, and app lock remain available.
         </Text>
@@ -230,14 +232,14 @@ export default function ModuleScreen({ route }: Props) {
 
   return (
     <>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>BRITUME • {section}</Text>
-        <Text style={styles.title}>{copy.title}</Text>
-        <Text style={styles.body}>{copy.intro}</Text>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: palette.background }]} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • {section}</Text>
+        <Text style={[styles.title, { color: palette.text }]}>{copy.title}</Text>
+        <Text style={[styles.body, { color: palette.muted }]}>{copy.intro}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => setComposerVisible(true)}
-          style={styles.primaryButton}
+          style={[styles.primaryButton, { backgroundColor: palette.accent }]}
         >
           <Text style={styles.primaryButtonText}>{copy.add}</Text>
         </Pressable>
@@ -247,24 +249,24 @@ export default function ModuleScreen({ route }: Props) {
           onChangeText={setQuery}
           placeholder={`Search ${section.toLowerCase()}`}
           placeholderTextColor="#7d8797"
-          style={styles.input}
+          style={[styles.input, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.text }]}
         />
         {loading ? (
-          <View style={styles.stateBox}>
-            <ActivityIndicator color="#d9b867" />
-            <Text style={styles.muted}>Loading posts…</Text>
+          <View style={[styles.stateBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <ActivityIndicator color={palette.accent} />
+            <Text style={[styles.muted, { color: palette.muted }]}>Loading posts…</Text>
           </View>
         ) : error ? (
-          <View style={styles.stateBox}>
+          <View style={[styles.stateBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable onPress={() => void loadPosts()} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Try again</Text>
+            <Pressable onPress={() => void loadPosts()} style={[styles.secondaryButton, { borderColor: palette.border }]}>
+              <Text style={[styles.secondaryButtonText, { color: palette.text }]}>Try again</Text>
             </Pressable>
           </View>
         ) : visiblePosts.length === 0 ? (
-          <View style={styles.stateBox}>
-            <Text style={styles.postTitle}>{query ? 'No matching posts' : 'Nothing here yet'}</Text>
-            <Text style={styles.muted}>
+          <View style={[styles.stateBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.postTitle, { color: palette.text }]}>{query ? 'No matching posts' : 'Nothing here yet'}</Text>
+            <Text style={[styles.muted, { color: palette.muted }]}>
               {query ? 'Try another search.' : `Be the first to share something in ${section}.`}
             </Text>
           </View>
@@ -274,14 +276,14 @@ export default function ModuleScreen({ route }: Props) {
             const isVideoFile = isPlayableVideoUrl(videoUrl);
             const playableSource = offlineUris[post.id] ?? videoUrl;
             return (
-              <View key={post.id} style={styles.postCard}>
+              <View key={post.id} style={[styles.postCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                 <View style={styles.postHeader}>
                   <View style={styles.postAuthor}>
-                    <Text style={styles.authorName}>
+                      <Text style={[styles.authorName, { color: palette.text }]}>
                       {post.author?.display_name || post.author?.username || 'BRITUME member'}
                     </Text>
                     {post.author?.username ? (
-                      <Text style={styles.authorHandle}>@{post.author.username}</Text>
+                      <Text style={[styles.authorHandle, { color: palette.muted }]}>@{post.author.username}</Text>
                     ) : null}
                   </View>
                   {post.author_id === post.current_user_id ? (
@@ -290,9 +292,9 @@ export default function ModuleScreen({ route }: Props) {
                     </Pressable>
                   ) : null}
                 </View>
-                <Text style={styles.postTitle}>{post.title}</Text>
-                {post.price_label ? <Text style={styles.price}>{post.price_label}</Text> : null}
-                <Text style={styles.postBody}>{post.body}</Text>
+                <Text style={[styles.postTitle, { color: palette.text }]}>{post.title}</Text>
+                {post.price_label ? <Text style={[styles.price, { color: palette.accent }]}>{post.price_label}</Text> : null}
+                <Text style={[styles.postBody, { color: palette.muted }]}>{post.body}</Text>
                 {section === 'TV' && videoUrl && isVideoFile ? (
                   <>
                     <Pressable
@@ -300,16 +302,16 @@ export default function ModuleScreen({ route }: Props) {
                       onPress={() => setActiveVideo({ title: post.title, uri: playableSource })}
                       style={styles.linkButton}
                     >
-                      <Text style={styles.linkButtonText}>Watch video</Text>
+                      <Text style={[styles.linkButtonText, { color: palette.accent }]}>Watch video</Text>
                     </Pressable>
                     {Platform.OS !== 'web' && isOfflineVideoUrl(videoUrl) ? (
                       <Pressable
                         accessibilityRole="button"
                         disabled={downloadingId === post.id}
                         onPress={() => void saveOffline(post)}
-                        style={styles.offlineButton}
+                        style={[styles.offlineButton, { borderColor: palette.border }]}
                       >
-                        <Text style={styles.offlineButtonText}>
+                          <Text style={[styles.offlineButtonText, { color: palette.accent }]}>
                           {downloadingId === post.id
                             ? 'Downloading…'
                             : offlineUris[post.id]
@@ -325,7 +327,7 @@ export default function ModuleScreen({ route }: Props) {
                   onPress={() => void Linking.openURL(post.media_url!)}
                     style={styles.linkButton}
                   >
-                    <Text style={styles.linkButtonText}>
+                    <Text style={[styles.linkButtonText, { color: palette.accent }]}>
                       {section === 'TV' ? 'Open video link' : 'Open link'}
                     </Text>
                   </Pressable>
@@ -343,8 +345,8 @@ export default function ModuleScreen({ route }: Props) {
         onRequestClose={resetComposer}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.composer}>
-            <Text style={styles.composerTitle}>{copy.add}</Text>
+          <View style={[styles.composer, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Text style={[styles.composerTitle, { color: palette.text }]}>{copy.add}</Text>
             <TextInput
               accessibilityLabel="Post title"
               value={title}
@@ -352,7 +354,7 @@ export default function ModuleScreen({ route }: Props) {
               placeholder={section === 'WEAR' ? 'Product or brand name' : 'Title'}
               placeholderTextColor="#7d8797"
               maxLength={120}
-              style={styles.input}
+              style={[styles.input, { backgroundColor: palette.background, borderColor: palette.border, color: palette.text }]}
             />
             {section === 'WEAR' ? (
               <TextInput
@@ -362,7 +364,7 @@ export default function ModuleScreen({ route }: Props) {
                 placeholder="Price (optional)"
                 placeholderTextColor="#7d8797"
                 maxLength={50}
-                style={styles.input}
+                style={[styles.input, { backgroundColor: palette.background, borderColor: palette.border, color: palette.text }]}
               />
             ) : null}
             <TextInput
@@ -374,7 +376,7 @@ export default function ModuleScreen({ route }: Props) {
               maxLength={4000}
               multiline
               textAlignVertical="top"
-              style={[styles.input, styles.bodyInput]}
+              style={[styles.input, styles.bodyInput, { backgroundColor: palette.background, borderColor: palette.border, color: palette.text }]}
             />
             <TextInput
               accessibilityLabel={section === 'TV' ? 'Direct video URL' : 'Content link'}
@@ -384,18 +386,18 @@ export default function ModuleScreen({ route }: Props) {
               placeholderTextColor="#7d8797"
               autoCapitalize="none"
               keyboardType="url"
-              style={styles.input}
+              style={[styles.input, { backgroundColor: palette.background, borderColor: palette.border, color: palette.text }]}
             />
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
             <View style={styles.modalActions}>
-              <Pressable onPress={resetComposer} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              <Pressable onPress={resetComposer} style={[styles.secondaryButton, { borderColor: palette.border }]}>
+                <Text style={[styles.secondaryButtonText, { color: palette.text }]}>Cancel</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 disabled={!title.trim() || !body.trim() || saving}
                 onPress={() => void publishPost()}
-                style={[styles.primaryButton, (!title.trim() || !body.trim() || saving) && styles.disabled]}
+                style={[styles.primaryButton, { backgroundColor: palette.accent }, (!title.trim() || !body.trim() || saving) && styles.disabled]}
               >
                 <Text style={styles.primaryButtonText}>{saving ? 'Publishing…' : 'Publish'}</Text>
               </Pressable>
@@ -409,13 +411,13 @@ export default function ModuleScreen({ route }: Props) {
         animationType="slide"
         onRequestClose={() => setActiveVideo(null)}
       >
-        <View style={styles.videoModal}>
+        <View style={[styles.videoModal, { backgroundColor: palette.background }]}>
           <View style={styles.videoModalHeader}>
-            <Text numberOfLines={1} style={styles.videoModalTitle}>
+            <Text numberOfLines={1} style={[styles.videoModalTitle, { color: palette.text }]}>
               {activeVideo?.title ?? 'BRITUME TV'}
             </Text>
             <Pressable accessibilityRole="button" onPress={() => setActiveVideo(null)}>
-              <Text style={styles.closeText}>Close</Text>
+              <Text style={[styles.closeText, { color: palette.accent }]}>Close</Text>
             </Pressable>
           </View>
           {activeVideo ? <VideoPost source={activeVideo.uri} /> : null}

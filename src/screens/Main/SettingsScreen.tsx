@@ -5,6 +5,7 @@ import { File } from 'expo-file-system';
 import {
   Alert,
   Button,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -37,8 +38,9 @@ const settingsSections = [
     route: 'Security',
   },
   {
-    title: 'Privacy',
-    body: 'Visibility and data controls are not built yet.',
+    title: 'Privacy & permissions',
+    body: 'Manage BRITUME device permissions in system settings. Gallery media stays on your device unless you save a selected photo as a private wallpaper.',
+    action: 'device-settings',
   },
   {
     title: 'Notifications',
@@ -52,16 +54,22 @@ const settingsSections = [
   },
   {
     title: 'Premium',
-    body: 'View your account entitlement and future member benefits.',
+    body: 'Check verified membership status, expiration, and billing setup.',
     route: 'Premium',
   },
   {
-    title: 'Language',
-    body: 'Language selection is not built yet.',
+    title: 'Gallery',
+    body: 'Choose on-device photos or videos and manage the current selection.',
+    route: 'Gallery',
+  },
+  {
+    title: 'Labs',
+    body: 'Enable or disable the account-synced Focus Mode and Compact Home experiments.',
+    route: 'Labs',
   },
   {
     title: 'Storage',
-    body: 'Storage usage and media management are not built yet.',
+    body: 'Review or clear on-device TV downloads.',
   },
   {
     title: 'About BRITUME',
@@ -174,6 +182,14 @@ export default function SettingsScreen({
     Alert.alert('Signed out', 'You have been signed out of BRITUME.');
   }
 
+  async function openDeviceSettings() {
+    try {
+      await Linking.openSettings();
+    } catch {
+      Alert.alert('Settings unavailable', 'Open your device settings to manage BRITUME permissions.');
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: palette.background }]}>
       <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • SETTINGS</Text>
@@ -215,22 +231,24 @@ export default function SettingsScreen({
           );
         }
 
-        const implemented = 'route' in section;
+        const implemented = 'route' in section || 'action' in section;
         const onPress = () => {
-          if (!implemented) {
-            return;
-          }
-
-          if (section.route === 'PROFILE') {
+          if ('action' in section && section.action === 'device-settings') {
+            void openDeviceSettings();
+          } else if ('route' in section && section.route === 'PROFILE') {
             navigation.navigate('PROFILE');
-          } else if (section.route === 'Security') {
+          } else if ('route' in section && section.route === 'Security') {
             navigation.navigate('Security');
-          } else if (section.route === 'Notifications') {
+          } else if ('route' in section && section.route === 'Notifications') {
             navigation.navigate('Notifications');
-          } else if (section.route === 'Themes') {
+          } else if ('route' in section && section.route === 'Themes') {
             navigation.navigate('Themes');
-          } else if (section.route === 'Premium') {
+          } else if ('route' in section && section.route === 'Premium') {
             navigation.navigate('Premium');
+          } else if ('route' in section && section.route === 'Gallery') {
+            navigation.navigate('Gallery');
+          } else if ('route' in section && section.route === 'Labs') {
+            navigation.navigate('Labs');
           }
         };
 
@@ -250,7 +268,9 @@ export default function SettingsScreen({
           >
             <View style={styles.sectionHeading}>
               <Text style={[styles.sectionTitle, { color: palette.text }]}>{section.title}</Text>
-              {!implemented && <Text style={styles.comingSoon}>COMING SOON</Text>}
+              {section.title === 'Privacy & permissions' ? (
+                <Text style={[styles.comingSoon, { color: palette.accent }]}>DEVICE SETTINGS</Text>
+              ) : null}
             </View>
             <Text style={[styles.sectionBody, { color: palette.muted }]}>{section.body}</Text>
           </Pressable>

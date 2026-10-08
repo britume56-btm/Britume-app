@@ -3,23 +3,34 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../../lib/supabase';
 import { AdSlot } from '../../components/monetization/MonetizationSlots';
-import { getPremiumEntitlement } from '../../services/launchFeatureService';
+import {
+  getPremiumEntitlement,
+  hasPremiumAccess,
+} from '../../services/launchFeatureService';
 import type { PremiumEntitlement } from '../../services/launchFeatureService';
+import {
+  getBillingProviderStatus,
+  purchasePremium,
+  restorePremiumPurchases,
+} from '../../services/billingService';
 import { useAppTheme } from '../../theme/AppThemeContext';
 
 const BENEFITS = [
-  'A more personal BRITUME experience with premium themes',
-  'Future member benefits as they are released',
-  'Support for BRITUME as it grows',
+  'Nebula theme access while a verified entitlement is active',
+  'Membership state comes from the account entitlement record, not local purchase state',
+  'No other Premium-only features are enabled in this release',
 ];
 
 export default function PremiumScreen() {
   const { palette } = useAppTheme();
   const [entitlement, setEntitlement] = useState<PremiumEntitlement | null>(null);
   const [loading, setLoading] = useState(true);
+  const [restoring, setRestoring] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<boolean> => {
     setLoading(true);
     setError('');
     try {
@@ -28,8 +39,10 @@ export default function PremiumScreen() {
         throw new Error('Sign in again to view your account status.');
       }
       setEntitlement(await getPremiumEntitlement(data.user.id));
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Premium status could not be loaded.');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -41,7 +54,65 @@ export default function PremiumScreen() {
     }, [load])
   );
 
-  const active = entitlement?.status === 'active' || entitlement?.status === 'grace_period';
+  const active = entitlement ? hasPremiumAccess(entitlement) : false;
+  const billingStatus = getBillingProviderStatus();
+  const billingConfigured = billingStatus.configured;
+  const expired =
+    entitlement?.expires_at !== null &&
+    entitlement?.expires_at !== undefined &&
+    Date.parse(entitlement.expires_at) <= Date.now();
+
+  async function refreshMembership() {
+    if (restoring) {
+      return;
+    }
+    setRestoring(true);
+    setError('');
+    setNotice('');
+    try {
+      const restored = await restorePremiumPurchases();
+      const loaded = await load();
+      if (loaded) {
+        setNotice(
+          restored
+            ? 'Store restore requested. Access still comes from the verified BRITUME entitlement.'
+            : 'Entitlement refreshed. Store restore is unavailable until production billing is configured.'
+        );
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Membership could not be refreshed.');
+    } finally {
+      setRestoring(false);
+    }
+  }
+
+  async function startPurchase() {
+    const product = billingStatus.product;
+    if (!product || !billingConfigured || purchasing || restoring) {
+      return;
+    }
+    setPurchasing(true);
+    setError('');
+    setNotice('');
+    try {
+      const outcome = await purchasePremium(product.id);
+      if (outcome === 'cancelled') {
+        await load();
+        setNotice('Purchase cancelled. No local membership was granted.');
+        return;
+      }
+      const loaded = await load();
+      if (!loaded) {
+        setNotice('Store verification returned, but BRITUME could not refresh the account entitlement. Retry the status check.');
+      } else {
+        setNotice('Store transaction verified. The membership status shown above is refreshed from BRITUME.');
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The store purchase could not be completed.');
+    } finally {
+      setPurchasing(false);
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: palette.background }]}>
@@ -53,7 +124,19 @@ export default function PremiumScreen() {
           <ActivityIndicator color={palette.accent} style={styles.spinner} />
         ) : (
           <Text style={[styles.status, { color: active ? palette.accent : palette.text }]}>
-            {active ? 'Premium active' : entitlement?.status === 'past_due' ? 'Payment needs attention' : 'Not active'}
+            {active
+              ? entitlement?.status === 'grace_period'
+                ? 'Premium · grace period'
+                : entitlement?.status === 'canceled'
+                  ? 'Premium · active through period end'
+                  : 'Premium active'
+              : expired
+                ? 'Premium expired'
+                : entitlement?.status === 'past_due'
+                  ? 'Payment needs attention'
+                  : entitlement?.status === 'canceled'
+                    ? 'Membership canceled'
+                    : 'Free plan'}
           </Text>
         )}
         {entitlement?.expires_at ? (
@@ -62,7 +145,24 @@ export default function PremiumScreen() {
           </Text>
         ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {notice ? <Text style={[styles.notice, { color: palette.muted }]}>{notice}</Text> : null}
+        {!loading && entitlement?.provider ? (
+          <Text style={[styles.muted, { color: palette.muted }]}>
+            Provider: {entitlement.provider}{entitlement.product_id ? ` · ${entitlement.product_id}` : ''}
+          </Text>
+        ) : null}
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        disabled={loading || restoring}
+        onPress={() => void refreshMembership()}
+        style={[styles.refreshButton, { borderColor: palette.border }, (loading || restoring) && styles.disabled]}
+      >
+        <Text style={[styles.refreshText, { color: palette.accent }]}>
+          {restoring ? 'Checking membership…' : 'Refresh / restore membership'}
+        </Text>
+      </Pressable>
 
       <Text style={[styles.sectionTitle, { color: palette.text }]}>What Premium can provide</Text>
       {BENEFITS.map((benefit) => (
@@ -73,18 +173,33 @@ export default function PremiumScreen() {
       ))}
 
       <View style={[styles.setupCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-        <Text style={[styles.setupTitle, { color: palette.text }]}>Purchases are not connected</Text>
+        <Text style={[styles.setupTitle, { color: palette.text }]}>
+          {billingConfigured ? 'Billing provider available' : 'Production billing is not configured'}
+        </Text>
+        {billingStatus.product ? (
+          <Text style={[styles.muted, { color: palette.muted }]}>
+            {billingStatus.product.title} · {billingStatus.product.formattedPrice}
+          </Text>
+        ) : null}
         <Text style={[styles.muted, { color: palette.muted }]}>
-          This screen reads account entitlements only. Connect and configure an app-store billing
-          provider before offering a purchase; no payment has been started or completed.
+          {billingConfigured
+            ? 'Purchases are routed through the configured store adapter and trusted server-side receipt verification.'
+            : 'Purchasing requires production Google Play billing, store products, and trusted server-side receipt verification. No purchase has been started or completed.'}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          disabled
-          style={[styles.purchaseButton, { backgroundColor: palette.accent, opacity: 0.5 }]}
+          accessibilityState={{ disabled: !billingConfigured || purchasing || loading || restoring }}
+          disabled={!billingConfigured || purchasing || loading || restoring}
+          onPress={() => void startPurchase()}
+          style={[styles.purchaseButton, { backgroundColor: palette.accent, opacity: !billingConfigured || purchasing || loading || restoring ? 0.5 : 1 }]}
         >
-          <Text style={styles.purchaseText}>Premium purchase unavailable</Text>
+          <Text style={styles.purchaseText}>
+            {purchasing
+              ? 'Verifying with store…'
+              : billingStatus.product
+                ? `Subscribe · ${billingStatus.product.formattedPrice}`
+                : 'Premium purchase unavailable'}
+          </Text>
         </Pressable>
       </View>
       <AdSlot label="Premium sponsor slot" />
@@ -109,4 +224,8 @@ const styles = StyleSheet.create({
   purchaseButton: { alignItems: 'center', borderRadius: 10, justifyContent: 'center', marginTop: 14, minHeight: 43, paddingHorizontal: 12 },
   purchaseText: { color: '#090d15', fontSize: 12, fontWeight: '900' },
   error: { color: '#f18e8e', fontSize: 12, marginTop: 9 },
+  notice: { fontSize: 12, lineHeight: 18, marginTop: 8 },
+  refreshButton: { alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, marginTop: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  refreshText: { fontSize: 12, fontWeight: '800' },
+  disabled: { opacity: 0.55 },
 });

@@ -17,7 +17,9 @@ export default function HomeScreen({
 }: {
   navigation: HomeNavigationProp;
 }) {
-  const { palette, backgroundUri } = useAppTheme();
+  const { palette, backgroundUri, experiments } = useAppTheme();
+  const compact = experiments['compact-home'];
+  const focusMode = experiments['focus-mode'];
   return (
     <ImageBackground
       source={backgroundUri ? { uri: backgroundUri } : undefined}
@@ -27,9 +29,13 @@ export default function HomeScreen({
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: backgroundUri ? 'transparent' : palette.background }]}>
       <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • ONE APP</Text>
       <Text style={[styles.title, { color: palette.text }]}>Your BRITUME ecosystem</Text>
-      <Text style={[styles.body, { color: palette.muted }]}>
-        One unified app for living, social, media, creativity, technology, and growth.
-      </Text>
+      {!focusMode ? (
+        <Text style={[styles.body, { color: palette.muted }]}>
+          One unified app for living, social, media, creativity, technology, and growth.
+        </Text>
+      ) : (
+        <Text style={[styles.focusNote, { color: palette.muted }]}>Focus Mode · all sections remain available</Text>
+      )}
 
       <View style={styles.grid}>
         {BRITUME_SECTIONS.map((section) => {
@@ -70,6 +76,7 @@ export default function HomeScreen({
               style={({ pressed }) => [
                 styles.tile,
                 { backgroundColor: palette.surface, borderColor: palette.border },
+                compact && section.name !== 'GAMES' && styles.compactTile,
                 pressed && { borderColor: palette.accent, opacity: 0.75 },
               ]}
             >
@@ -111,6 +118,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 18,
   },
+  focusNote: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -127,6 +139,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 90,
+  },
+  compactTile: {
+    minHeight: 66,
+    paddingVertical: 10,
   },
   tileIcon: {
     color: '#d9b867',

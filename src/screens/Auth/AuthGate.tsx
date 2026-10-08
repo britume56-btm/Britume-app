@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 
-type Mode = 'welcome' | 'signup' | 'signin';
+type Mode = 'welcome' | 'signup' | 'signin' | 'recover';
 
 export default function AuthGate() {
   const [mode, setMode] = useState<Mode>('welcome');
@@ -28,7 +28,16 @@ export default function AuthGate() {
     return <SignUpScreen onBack={() => setMode('welcome')} />;
   }
 
-  return <SignInScreen onBack={() => setMode('welcome')} />;
+  if (mode === 'recover') {
+    return <PasswordResetRequestScreen onBack={() => setMode('signin')} />;
+  }
+
+  return (
+    <SignInScreen
+      onBack={() => setMode('welcome')}
+      onForgotPassword={() => setMode('recover')}
+    />
+  );
 }
 
 function WelcomeScreen({
@@ -175,7 +184,13 @@ function SignUpScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function SignInScreen({ onBack }: { onBack: () => void }) {
+function SignInScreen({
+  onBack,
+  onForgotPassword,
+}: {
+  onBack: () => void;
+  onForgotPassword: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -220,7 +235,63 @@ function SignInScreen({ onBack }: { onBack: () => void }) {
             onPress={handleSignIn}
             disabled={loading}
           />
+          <Button label="FORGOT PASSWORD?" onPress={onForgotPassword} secondary />
           <Button label="BACK" onPress={onBack} secondary />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function PasswordResetRequestScreen({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function sendResetLink() {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) {
+      Alert.alert('Email required', 'Enter the email address for your BRITUME account.');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: 'britume://auth/callback?type=recovery',
+    });
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Could not send reset link', error.message);
+      return;
+    }
+
+    Alert.alert(
+      'Check your email',
+      'If a BRITUME account uses that address, password reset instructions are on the way.'
+    );
+  }
+
+  return (
+    <View style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Reset your password</Text>
+          <Text style={styles.body}>
+            We’ll send a secure link to the email address on your BRITUME account.
+          </Text>
+          <Field
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@gmail.com"
+            keyboardType="email-address"
+          />
+          <Button
+            label={loading ? 'SENDING…' : 'SEND RESET LINK'}
+            onPress={() => void sendResetLink()}
+            disabled={loading}
+          />
+          <Button label="BACK TO SIGN IN" onPress={onBack} secondary />
         </View>
       </ScrollView>
     </View>

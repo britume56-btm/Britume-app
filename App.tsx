@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import { supabase } from './lib/supabase';
 import AuthGate from './src/screens/Auth/AuthGate';
+import PasswordRecoveryScreen from './src/screens/Auth/PasswordRecoveryScreen';
 import AppNavigator from './src/navigation/AppNavigator';
 import { AppLockProvider, useAppLock } from './src/security/AppLockContext';
 import AppLockScreen from './src/screens/Security/AppLockScreen';
@@ -74,6 +75,7 @@ function AuthenticatedApp() {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -95,17 +97,27 @@ export default function App() {
 
     void load();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecoveryPending(true);
+      } else if (event === 'SIGNED_OUT') {
+        setPasswordRecoveryPending(false);
+      }
       if (mounted) {
         setSession(nextSession);
       }
     });
 
     const handleDeepLink = async (url: string) => {
+      const parsedUrl = Linking.parse(url);
+      if (parsedUrl.queryParams?.type === 'recovery') {
+        setPasswordRecoveryPending(true);
+      }
       if (url.includes('code=')) {
         const { error } = await supabase.auth.exchangeCodeForSession(url);
         if (error) {
           console.error('Deep link exchange failed:', error.message);
+          setPasswordRecoveryPending(false);
         }
       }
     };
@@ -140,6 +152,14 @@ export default function App() {
         <ActivityIndicator size="large" color="#d9b867" />
         <Text style={{ color: '#f4f6fa', marginTop: 12 }}>Starting BRITUME…</Text>
       </SafeAreaView>
+    );
+  }
+
+  if (session && passwordRecoveryPending) {
+    return (
+      <PasswordRecoveryScreen
+        onComplete={() => setPasswordRecoveryPending(false)}
+      />
     );
   }
 

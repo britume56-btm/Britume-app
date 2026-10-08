@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -23,20 +23,12 @@ export default function GalleryScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [openPermissionSettings, setOpenPermissionSettings] = useState(false);
 
   async function openLibrary() {
     setError('');
     setNotice('');
     setLoading(true);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted && permission.accessPrivileges !== 'limited') {
-        setOpenPermissionSettings(!permission.canAskAgain);
-        setError('Allow photo-library access in your device settings to select media.');
-        return;
-      }
-      setOpenPermissionSettings(false);
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
         allowsMultipleSelection: true,
@@ -83,11 +75,6 @@ export default function GalleryScreen({ navigation, route }: Props) {
         {loading ? <ActivityIndicator color="#090d15" /> : <Text style={styles.buttonText}>{assets.length ? 'Choose different media' : 'Open device gallery'}</Text>}
       </Pressable>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {openPermissionSettings ? (
-        <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} style={styles.settingsLink}>
-          <Text style={[styles.clearText, { color: palette.accent }]}>Open device permission settings</Text>
-        </Pressable>
-      ) : null}
       {notice ? <Text style={[styles.notice, { color: palette.muted }]}>{notice}</Text> : null}
       {assets.length ? (
         <>

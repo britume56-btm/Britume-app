@@ -40,7 +40,8 @@ npm install
    - `EXPO_PUBLIC_SUPABASE_URL` — your Supabase project URL
    - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — your public publishable/anon key
 4. Enable Email authentication in Supabase
-5. Add deep-link redirect URL: `britume://auth/callback`
+5. Add both Auth redirect URLs: `britume://auth/callback` and
+   `britume://auth/callback?type=recovery`
 6. Create a storage bucket named `avatars` with **Public access off**
 7. Run `supabase/schema.sql` in the Supabase SQL Editor.
 8. Run the timestamped SQL migrations in `supabase/migrations` in order. For
@@ -75,6 +76,13 @@ the target Supabase project. Push delivery still needs a push provider and
 device tokens; the in-app notification list and preference controls do not
 send push messages.
 
+`supabase/functions/delete-account/index.ts` is the server-side account
+deletion endpoint used by SETTINGS. Deploy it with
+`supabase functions deploy delete-account` and configure its server-only
+Supabase secrets before enabling account deletion against a real project.
+See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the release
+and provider setup checklist.
+
 Theme settings, experiments, notification preferences, and in-app notification
 events depend on the migrations above. Gallery browsing uses the device picker;
 selected media is not uploaded unless a photo is saved as a private theme
@@ -103,31 +111,36 @@ Then:
 2. **Check your email** for verification link
 3. **Click the link** — it will deep-link to the app and sign you in
 4. **Go to PROFILE** — upload an avatar, set your display name
-5. **Set a PIN** from SETTINGS → Security, then background and reopen the app to verify the lock
-6. **Explore section tiles** — open the TV, TECHNOLOGIES, STUDIOS, WEAR, and
+5. **Test account recovery** from SIGN IN → FORGOT PASSWORD; follow the email
+   link and set a new password in the app
+6. **Change your password** from SETTINGS. On a disposable test account, verify
+   account deletion; it requires password reauthentication and the deployed
+   Edge Function.
+7. **Set a PIN** from SETTINGS → Security, then background and reopen the app to verify the lock
+8. **Explore section tiles** — open the TV, TECHNOLOGIES, STUDIOS, WEAR, and
    FOUNDATION content areas
-7. **Open THEMES** — preview a built-in or custom theme, choose an accent, and
+9. **Open THEMES** — preview a built-in or custom theme, choose an accent, and
    save/apply/reset it. Custom wallpaper upload requires the launch-feature
    migration and private storage bucket.
-8. **Open GALLERY** — select photos/videos from the device, preview media, and
+10. **Open GALLERY** — select photos/videos from the device, preview media, and
    try video playback. Gallery selection remains local.
-9. **Open LABS** — enable Focus Mode or Compact Home and confirm the LIVING
+11. **Open LABS** — enable Focus Mode or Compact Home and confirm the LIVING
    screen changes; settings sync through `user_preferences`.
-10. **Open NOTIFICATIONS** — verify preferences and read-state controls. Real
+12. **Open NOTIFICATIONS** — verify preferences and read-state controls. Real
     social/account event notifications require the completion migration.
-11. **Open SOCIAL** — create/edit/delete a post, search profiles, follow someone,
+13. **Open SOCIAL** — create/edit/delete a post, search profiles, follow someone,
    like a post, add a comment, and view follower/following lists
-12. **Open CHAT** — search for a profile, start a one-to-one conversation, send
+14. **Open CHAT** — search for a profile, start a one-to-one conversation, send
    messages from both accounts, check unread state, and remove a sent message
    from one account's history
-13. Apply `supabase/migrations/20261007100000_content_sections.sql` after the
+15. Apply `supabase/migrations/20261007100000_content_sections.sql` after the
    SOCIAL + CHAT migration, then test posting and searching in TV,
    TECHNOLOGIES, STUDIOS, WEAR, and FOUNDATION. TV offline downloads support
    direct MP4 links; HLS links stream but are not downloaded for offline use.
-14. **Open PREMIUM** — confirm that the server entitlement determines status;
+16. **Open PREMIUM** — confirm that the server entitlement determines status;
     purchases remain disabled until production billing and receipt verification
     are configured.
-15. **Sign out** from SETTINGS
+17. **Sign out** from SETTINGS
 
 ## SOCIAL + CHAT database tests
 
@@ -156,9 +169,10 @@ npx expo install --check
 
 `eas.json` includes an internal APK profile for device testing and an Android
 App Bundle profile for a later Play Console upload. Configure/link the app with
-EAS and its Android signing credentials before running `eas build`; these build
-profiles do not publish the app. Increase `android.versionCode` in `app.json`
-for each Play Console release.
+EAS and its Android signing credentials before running
+`eas build --profile internal --platform android`; this creates an internal APK
+and does not publish the app. `android.versionCode` is currently `1` for the
+first internal build. Increase it before each later Play Console upload.
 
 ## Project Structure
 
@@ -166,12 +180,13 @@ for each Play Console release.
 src/
   screens/
     Auth/
-      AuthGate.tsx       # Welcome, Sign up, Sign in screens
+      AuthGate.tsx       # Welcome, sign up, sign in, and reset-email screens
+      PasswordRecoveryScreen.tsx # Set a new password from a recovery link
     Main/
       HomeScreen.tsx     # Navigable BRITUME section tiles
       ModuleScreen.tsx   # Searchable posts for launch content sections
       ProfileScreen.tsx  # Profile + avatar upload
-       SettingsScreen.tsx # Account/security, offline storage, app info, sign out
+      SettingsScreen.tsx # Password/privacy, account deletion, storage, app info
       Social/
         SocialScreen.tsx       # Feed, discovery, post actions
         PublicProfileScreen.tsx
@@ -208,14 +223,15 @@ src/
 
 1. Apply and verify the existing Supabase migrations in a non-production project,
    then smoke-test authentication, feeds, and RLS with separate accounts.
-2. Link the app to EAS, create the internal Android APK, and test auth/deep links,
-   the app lock, video playback/downloads, and storage cleanup on a device.
-3. Finish account recovery/password changes and any additional privacy/data
-   controls needed for production.
-4. Configure Google Play billing and a trusted entitlement verifier before
-   enabling purchases. Connect a rewarded-ad provider with server-side receipt
-   verification before offering unlocks, and configure Expo/EAS device tokens
-   plus a push provider before sending push notifications.
+2. Configure the real BRITUME icon and splash source assets; none are present
+   in this repository yet.
+3. Link the EAS project, set its build environment and Android signing, then
+   build and test the internal APK on a device. Do not publish it to Google Play.
+4. Configure real Google Play products and trusted server-side purchase
+   verification before enabling billing; install a real rewarded-ad provider
+   and server verification before offering ad rewards.
+5. Configure real device-token registration and push delivery before claiming
+   push support. In-app notifications are not push notifications.
 
 ## Notes
 

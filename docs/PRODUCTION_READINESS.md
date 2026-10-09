@@ -6,15 +6,15 @@ apply SQL to a live Supabase project, create store products, or publish an APK.
 
 ## Android internal APK
 
-- Expo SDK and package dependencies are declared in package.json and locked
-  in package-lock.json.
-- Android application ID: com.britume.app. Treat it as permanent after the
+- Expo SDK and package dependencies are declared in `package.json` and locked
+  in `package-lock.json`.
+- Android application ID: `com.britume.app`. Treat it as permanent after the
   first Play Console release.
-- App version: 0.1.0. Android versionCode is 1, suitable for the first
+- App version: `0.1.0`. Android `versionCode` is `1`, suitable for the first
   internal build; increment it before each later Play Console upload.
-- eas.json has an internal profile and retains the existing preview
+- `eas.json` has an `internal` profile and retains the existing `preview`
   profile. Both create an internally distributed APK.
-- Verify that the owner, slug, and project ID in app.json resolve to the
+- Verify that the owner, slug, and project ID in `app.json` resolve to the
   existing Expo project. Confirm the existing Android signing credentials are
   available, set the two public Supabase build variables, then run:
 
@@ -25,7 +25,7 @@ apply SQL to a live Supabase project, create store products, or publish an APK.
 - The repo has no approved launcher icon or splash image, so the Expo icon and
   splash fields are intentionally not pointed at substitute artwork. Add the
   supplied BRITUME source assets before calling the APK release-ready.
-- The app config contains the existing Expo project identifiers supplied by
+- `app.json` contains the existing Expo project identifiers supplied by
   the owner. This source configuration does not confirm remote Expo access or
   Android signing readiness; verify both in EAS before a production build. No
   real Supabase build values are committed. Do not commit those values or a
@@ -34,24 +34,24 @@ apply SQL to a live Supabase project, create store products, or publish an APK.
 ## Supabase schema and migrations
 
 The migration files are repository SQL only; this work does not connect to or
-modify a live Supabase project. Apply supabase/schema.sql first on a fresh
+modify a live Supabase project. Apply `supabase/schema.sql` first on a fresh
 project, then apply the timestamped migrations in ascending order:
 
-1. 20261005000000_profile_avatar_paths.sql
-2. 20261007060000_social_chat_phase1.sql
-3. 20261007100000_content_sections.sql
-4. 20261007150000_launch_features.sql
-5. 20261007200000_feature_completion.sql
+1. `20261005000000_profile_avatar_paths.sql`
+2. `20261007060000_social_chat_phase1.sql`
+3. `20261007100000_content_sections.sql`
+4. `20261007150000_launch_features.sql`
+5. `20261007200000_feature_completion.sql`
 
 The migrations received a repository/static review, but no live-database
-db push or SQL test has been run. Run
-supabase/tests/social_chat_rls.test.sql only on a disposable
+`db push` or SQL test has been run. Run
+`supabase/tests/social_chat_rls.test.sql` only on a disposable
 Supabase-compatible database after its documented prerequisites; never point
 it at production.
 
 ### Account deletion function
 
-supabase/functions/delete-account/index.ts validates the caller's Supabase
+`supabase/functions/delete-account/index.ts` validates the caller's Supabase
 access token, requires a recent password reauthentication, removes that
 account's private avatar and theme-background objects, then deletes the Auth
 user so foreign-key cascades can remove account rows. It also removes copied
@@ -63,15 +63,15 @@ storage buckets before deployment:
 supabase functions deploy delete-account
 ```
 
-The Supabase function runtime must provide SUPABASE_URL,
-SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY. These are server-side
+The Supabase function runtime must provide `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. These are server-side
 function secrets; the service-role key must never be put in the app, EAS
-EXPO_PUBLIC_ variables, or Git. The app requires this function for account
+`EXPO_PUBLIC_` variables, or Git. The app requires this function for account
 deletion and reports an error if it is not deployed.
 
 ## Authentication and privacy
 
-- Password reset emails deep-link to britume://auth/callback?type=recovery;
+- Password reset emails deep-link to `britume://auth/callback?type=recovery`;
   add that redirect URL to the target Supabase Auth allowlist.
 - Password changes and account deletion reauthenticate with the current
   password. Account deletion additionally requires typing the current account
@@ -84,8 +84,8 @@ deletion and reports an error if it is not deployed.
 
 ## Billing, rewarded ads, and push delivery
 
-- Premium entitlement reads are wired to premium_entitlements, whose writes
-  are not granted to app clients. billingService.ts exposes a fail-closed
+- Premium entitlement reads are wired to `premium_entitlements`, whose writes
+  are not granted to app clients. `billingService.ts` exposes a fail-closed
   provider adapter; no store SDK, product ID, purchase flow, or receipt
   verifier is configured. Do not enable purchase controls until real Google
   Play products and trusted server-side purchase-token verification exist.
@@ -103,9 +103,9 @@ deletion and reports an error if it is not deployed.
 
 Only these client-visible values are currently used:
 
-- EXPO_PUBLIC_SUPABASE_URL
-- EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-Anything prefixed EXPO_PUBLIC_ is included in the client bundle and is not a
+Anything prefixed `EXPO_PUBLIC_` is included in the client bundle and is not a
 secret. Configure these per EAS environment for builds. Keep server-side keys
-such as SUPABASE_SERVICE_ROLE_KEY in Supabase Edge Function secrets only.
+such as `SUPABASE_SERVICE_ROLE_KEY` in Supabase Edge Function secrets only.

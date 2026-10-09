@@ -14,8 +14,9 @@ apply SQL to a live Supabase project, create store products, or publish an APK.
   internal build; increment it before each later Play Console upload.
 - `eas.json` has an `internal` profile and retains the existing `preview`
   profile. Both create an internally distributed APK.
-- Link the EAS project and Android signing credentials, set the two public
-  Supabase build variables, then run:
+- Verify that the owner, slug, and project ID in `app.json` resolve to the
+  existing Expo project. Confirm the existing Android signing credentials are
+  available, set the two public Supabase build variables, then run:
 
   ```bash
   eas build --profile internal --platform android
@@ -24,8 +25,11 @@ apply SQL to a live Supabase project, create store products, or publish an APK.
 - The repo has no approved launcher icon or splash image, so the Expo icon and
   splash fields are intentionally not pointed at substitute artwork. Add the
   supplied BRITUME source assets before calling the APK release-ready.
-- Current `main` does not contain an EAS project ID or real Supabase build
-  variables. Do not commit those values or a service-role key.
+- `app.json` contains the existing Expo project identifiers supplied by
+  the owner. This source configuration does not confirm remote Expo access or
+  Android signing readiness; verify both in EAS before a production build. No
+  real Supabase build values are committed. Do not commit those values or a
+  service-role key.
 
 ## Supabase schema and migrations
 

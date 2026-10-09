@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "BRITUME",
-    "slug": "britume",
+    "slug": "britume-2",
+    "owner": "bri-tume1s-team",
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "britume",
@@ -49,6 +50,11 @@
         "keychain-access-groups": [
           "$(AppIdentifierPrefix)com.britume.app"
         ]
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "76050882-456e-433a-8802-6d23bff08e1d"
       }
     }
   }

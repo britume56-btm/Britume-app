@@ -6,8 +6,8 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabaseConfig = {
-  url: supabaseUrl ?? 'https://your-project.supabase.co',
-  key: supabasePublishableKey ?? 'your-publishable-key-here',
+  https://bmlwsztgllallywbklqb.supabase.co/rest/v1/
+    sb_publishable_S8qoD4IbThJ7jr6bdKdKNw_SbXrTss
   isConfigured: Boolean(supabaseUrl && supabasePublishableKey),
 };
 

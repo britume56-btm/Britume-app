@@ -6,27 +6,16 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "ios": {
-        "resourceClass": "m-medium"
-      }
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal"
     },
     "internal": {
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://yitvawpbrrbybxlxndum.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "PASTE_YOUR_SB_PUBLISHABLE_KEY_HERE"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://yitvawpbrrbybxlxndum.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "PASTE_YOUR_SB_PUBLISHABLE_KEY_HERE"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {

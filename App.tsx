@@ -9,7 +9,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { AppLockProvider, useAppLock } from './src/security/AppLockContext';
 import AppLockScreen from './src/screens/Security/AppLockScreen';
 import { AppThemeProvider } from './src/theme/AppThemeContext';
-
+import BritumeEyesAssistant from './src/components/BritumeEyesAssistant';
 const prefix = Linking.createURL('/');
 
 function AuthenticatedApp() {
@@ -180,4 +180,3 @@ export default function App() {
     </AppThemeProvider>
   );
 }
-import BritumeEyesAssistant from './src/components/BritumeEyesAssistant';

@@ -5,6 +5,12 @@
     "owner": "bri-tume1s-team",
     "version": "0.1.0",
     "orientation": "portrait",
+    "icon": "./britume-app-icon.png",
+"splash": {
+  "image": "./britume-splash.png",
+  "resizeMode": "contain",
+  "backgroundColor": "#000000"
+},
     "scheme": "britume",
     "userInterfaceStyle": "dark",
     "plugins": [

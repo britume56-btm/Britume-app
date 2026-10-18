@@ -69,7 +69,12 @@ function AuthenticatedApp() {
     return <AppLockScreen mode="verify" onUnlock={unlock} />;
   }
 
-  return <AppNavigator />;
+  return (
+  <View style={{ flex: 1, backgroundColor: '#000000' }}>
+    <AppNavigator />
+    <BritumeEyesAssistant />
+  </View>
+);
 }
 
 export default function App() {

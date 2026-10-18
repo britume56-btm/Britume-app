@@ -175,3 +175,4 @@ export default function App() {
     </AppThemeProvider>
   );
 }
+import BritumeEyesAssistant from './src/components/BritumeEyesAssistant';

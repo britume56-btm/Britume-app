@@ -44,8 +44,24 @@ display_name?: string | null;
 };
 };
 
+function addHexOpacity(color: string, opacity: number): string {
+const normalized = color.trim();
+
+if (/^#[0-9a-fA-F]{6}$/.test(normalized)) {
+const alpha = Math.round(Math.max(0, Math.min(100, opacity)) * 2.55)
+.toString(16)
+.padStart(2, '0');
+
+return `${normalized}${alpha}`;
+
+}
+
+// Preserve valid theme colours if they are not six-digit hex colours.
+return normalized;
+}
+
 export default function HomeScreen({ navigation }: any) {
-const { palette, backgroundUri } = useAppTheme();
+const { palette } = useAppTheme();
 
 const [colorIndex, setColorIndex] = useState(0);
 const [autoCycle, setAutoCycle] = useState(true);
@@ -56,17 +72,27 @@ const [glassOpacity, setGlassOpacity] = useState(65);
 const [showControls, setShowControls] = useState(false);
 const [reducedMotion, setReducedMotion] = useState(false);
 const [posts, setPosts] = useState<LivingPost[]>([]);
-const [feedMessage, setFeedMessage] = useState('Loading BRITUME posts...');
+const [feedMessage, setFeedMessage] = useState(
+'Loading BRITUME posts...'
+);
 
 const blinkScale = useRef(new Animated.Value(1)).current;
 const glow = NEON_COLORS[colorIndex];
+const glowOpacity = glowStrength / 100;
+
+const glassBackground = addHexOpacity(
+palette.surface,
+glassOpacity
+);
 
 useEffect(() => {
 let active = true;
 
 AccessibilityInfo.isReduceMotionEnabled()
   .then((enabled) => {
-    if (active) setReducedMotion(enabled);
+    if (active) {
+      setReducedMotion(enabled);
+    }
   })
   .catch(() => {});
 
@@ -82,9 +108,11 @@ return () => {
 
 }, []);
 
-// Cycle through all six neon colours.
+// Cycle through the six neon colours.
 useEffect(() => {
-if (!autoCycle || reducedMotion) return;
+if (!autoCycle || reducedMotion) {
+return;
+}
 
 const timer = setInterval(() => {
   setColorIndex((current) => (current + 1) % NEON_COLORS.length);
@@ -94,9 +122,10 @@ return () => clearInterval(timer);
 
 }, [autoCycle, cycleSeconds, reducedMotion]);
 
-// Blink the eyes gently without running animations when reduced motion is enabled.
+// Blink gently, respecting the device's reduced-motion preference.
 useEffect(() => {
 if (reducedMotion) {
+blinkScale.stopAnimation();
 blinkScale.setValue(1);
 return;
 }
@@ -125,17 +154,23 @@ return () => {
 
 }, [blinkScale, blinkSeconds, reducedMotion]);
 
-// Load real posts from the signed-in user's existing BRITUME feed.
+// Load the signed-in user's existing BRITUME feed.
 useEffect(() => {
 let active = true;
 
 async function loadFeed() {
   try {
     const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
+
+    if (error) {
+      throw error;
+    }
 
     if (!data.user) {
-      if (active) setFeedMessage('Sign in to see your BRITUME feed.');
+      if (active) {
+        setPosts([]);
+        setFeedMessage('Sign in to see your BRITUME feed.');
+      }
       return;
     }
 
@@ -151,6 +186,7 @@ async function loadFeed() {
     }
   } catch {
     if (active) {
+      setPosts([]);
       setFeedMessage(
         'Your feed could not load. Check your connection and try again.'
       );
@@ -182,7 +218,6 @@ if (route === 'SPACE1' || route === 'SPACE2') {
   return;
 }
 
-// Don't navigate to routes that have not been implemented yet.
 if (route === 'AI' || route === 'DIARY' || route === 'LIBRARY') {
   setFeedMessage(
     `${route} needs its own screen before this shortcut can open it.`
@@ -192,27 +227,21 @@ if (route === 'AI' || route === 'DIARY' || route === 'LIBRARY') {
 }
 
 function openPostAuthor(post: LivingPost) {
-if (post.author_id) {
+if (!post.author_id) {
+return;
+}
+
 navigation.navigate('PublicProfile', {
-userId: post.author_id,
+  userId: post.author_id,
 });
-}
-}
 
-const glassBackground = "${palette.surface}${Math.round( (glassOpacity / 100) * 255 ) .toString(16) .padStart(2, '0')}";
-
-const glowOpacity = glowStrength / 100;
+}
 
 return (
 <ScrollView
 style={[
 styles.screen,
-{
-backgroundColor: palette.background,
-...(backgroundUri
-? { backgroundImage: undefined }
-: {}),
-},
+{ backgroundColor: palette.background },
 ]}
 contentContainerStyle={styles.content}
 >
@@ -222,7 +251,7 @@ pointerEvents="none"
 style={[
 styles.ambientLight,
 {
-backgroundColor: "${glow}18",
+backgroundColor: addHexOpacity(glow, 9),
 opacity: glowOpacity,
 },
 ]}
@@ -239,7 +268,7 @@ opacity: glowOpacity,
             borderColor: glow,
             shadowColor: glow,
             shadowOpacity: glowOpacity,
-            backgroundColor: `${glow}22`,
+            backgroundColor: addHexOpacity(glow, 13),
           },
         ]}
       >
@@ -287,9 +316,12 @@ opacity: glowOpacity,
     </Pressable>
   </View>
 
-  {/* Theme controls */}
+  {/* Automatic colour cycling */}
   <Pressable
     accessibilityRole="button"
+    accessibilityLabel={
+      autoCycle ? 'Pause neon colour cycling' : 'Resume neon colour cycling'
+    }
     onPress={() => setAutoCycle((value) => !value)}
     style={[
       styles.cycleButton,
@@ -302,6 +334,7 @@ opacity: glowOpacity,
     </Text>
   </Pressable>
 
+  {/* Theme controls */}
   {showControls && (
     <View
       style={[
@@ -326,6 +359,7 @@ opacity: glowOpacity,
             key={colour}
             accessibilityRole="button"
             accessibilityLabel={`Select neon colour ${index + 1}`}
+            accessibilityState={{ selected: index === colorIndex }}
             onPress={() => {
               setColorIndex(index);
               setAutoCycle(false);
@@ -346,8 +380,11 @@ opacity: glowOpacity,
       <Text style={[styles.controlLabel, { color: palette.text }]}>
         Glow strength: {glowStrength}%
       </Text>
+
       <View style={styles.adjustRow}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Decrease glow strength"
           onPress={() =>
             setGlowStrength((value) => Math.max(0, value - 5))
           }
@@ -355,6 +392,7 @@ opacity: glowOpacity,
         >
           <Text style={{ color: palette.text }}>−</Text>
         </Pressable>
+
         <View style={styles.adjustValue}>
           <View
             style={[
@@ -366,7 +404,10 @@ opacity: glowOpacity,
             ]}
           />
         </View>
+
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Increase glow strength"
           onPress={() =>
             setGlowStrength((value) => Math.min(100, value + 5))
           }
@@ -379,8 +420,11 @@ opacity: glowOpacity,
       <Text style={[styles.controlLabel, { color: palette.text }]}>
         Glass opacity: {glassOpacity}%
       </Text>
+
       <View style={styles.adjustRow}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Decrease glass opacity"
           onPress={() =>
             setGlassOpacity((value) => Math.max(20, value - 5))
           }
@@ -388,6 +432,7 @@ opacity: glowOpacity,
         >
           <Text style={{ color: palette.text }}>−</Text>
         </Pressable>
+
         <View style={styles.adjustValue}>
           <View
             style={[
@@ -399,7 +444,10 @@ opacity: glowOpacity,
             ]}
           />
         </View>
+
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Increase glass opacity"
           onPress={() =>
             setGlassOpacity((value) => Math.min(100, value + 5))
           }
@@ -412,17 +460,22 @@ opacity: glowOpacity,
       <Text style={[styles.controlLabel, { color: palette.text }]}>
         Colour cycle interval
       </Text>
+
       <View style={styles.optionRow}>
         {[5, 10, 15, 20].map((seconds) => (
           <Pressable
             key={seconds}
+            accessibilityRole="button"
+            accessibilityState={{ selected: cycleSeconds === seconds }}
             onPress={() => setCycleSeconds(seconds)}
             style={[
               styles.optionButton,
               {
                 borderColor: glow,
                 backgroundColor:
-                  cycleSeconds === seconds ? `${glow}35` : 'transparent',
+                  cycleSeconds === seconds
+                    ? addHexOpacity(glow, 21)
+                    : 'transparent',
               },
             ]}
           >
@@ -434,17 +487,22 @@ opacity: glowOpacity,
       <Text style={[styles.controlLabel, { color: palette.text }]}>
         Eye blink interval
       </Text>
+
       <View style={styles.optionRow}>
         {[1.3, 1.6, 2, 3].map((seconds) => (
           <Pressable
             key={seconds}
+            accessibilityRole="button"
+            accessibilityState={{ selected: blinkSeconds === seconds }}
             onPress={() => setBlinkSeconds(seconds)}
             style={[
               styles.optionButton,
               {
                 borderColor: glow,
                 backgroundColor:
-                  blinkSeconds === seconds ? `${glow}35` : 'transparent',
+                  blinkSeconds === seconds
+                    ? addHexOpacity(glow, 21)
+                    : 'transparent',
               },
             ]}
           >
@@ -465,6 +523,7 @@ opacity: glowOpacity,
       <Pressable
         key={item.label}
         accessibilityRole="button"
+        accessibilityLabel={`Open ${item.label}`}
         onPress={() => openShortcut(item.route)}
         style={({ pressed }) => [
           styles.shortcut,
@@ -472,11 +531,7 @@ opacity: glowOpacity,
             borderColor: glow,
             shadowColor: glow,
             shadowOpacity: glowOpacity * 0.35,
-            backgroundColor: `${glow}${Math.round(
-              (glassOpacity / 100) * 45
-            )
-              .toString(16)
-              .padStart(2, '0')}`,
+            backgroundColor: addHexOpacity(glow, glassOpacity * 0.45),
             opacity: pressed ? 0.7 : 1,
           },
         ]}
@@ -495,7 +550,7 @@ opacity: glowOpacity,
     ))}
   </ScrollView>
 
-  {/* Real Supabase feed */}
+  {/* Existing Supabase feed */}
   <View style={styles.feedHeading}>
     <Text style={[styles.feedTitle, { color: palette.text }]}>
       Your Living Feed
@@ -538,7 +593,7 @@ opacity: glowOpacity,
               styles.postCard,
               fullWidth ? styles.fullPost : styles.halfPost,
               {
-                borderColor: `${glow}CC`,
+                borderColor: addHexOpacity(glow, 80),
                 backgroundColor: glassBackground,
                 shadowColor: glow,
                 shadowOpacity: glowOpacity * 0.25,
@@ -548,12 +603,14 @@ opacity: glowOpacity,
             <Text style={[styles.postAuthor, { color: glow }]}>
               {author}
             </Text>
+
             <Text
               numberOfLines={fullWidth ? 8 : 5}
               style={[styles.postBody, { color: palette.text }]}
             >
               {post.body}
             </Text>
+
             <Text style={[styles.postFooter, { color: palette.muted }]}>
               BRITUME · Post
             </Text>
@@ -566,8 +623,8 @@ opacity: glowOpacity,
   <View style={[styles.noteCard, { borderColor: palette.border }]}>
     <Text style={[styles.noteText, { color: palette.muted }]}>
       Your existing BRITUME account, social feed and theme system are
-      retained. New modules and custom shortcut destinations need their
-      own implementation before they can open.
+      retained. AI, Diary, Library and custom shortcut destinations
+      still need their own screen implementations.
     </Text>
   </View>
 </ScrollView>
@@ -576,7 +633,9 @@ opacity: glowOpacity,
 }
 
 const styles = StyleSheet.create({
-screen: { flex: 1 },
+screen: {
+flex: 1,
+},
 content: {
 paddingHorizontal: 14,
 paddingTop: 14,
@@ -650,7 +709,10 @@ paddingHorizontal: 10,
 paddingVertical: 7,
 marginTop: 12,
 },
-cycleText: { fontSize: 11, fontWeight: '600' },
+cycleText: {
+fontSize: 11,
+fontWeight: '600',
+},
 controlCard: {
 borderWidth: 1,
 borderRadius: 18,
@@ -728,11 +790,26 @@ padding: 7,
 shadowRadius: 7,
 elevation: 2,
 },
-shortcutIcon: { fontSize: 22, marginBottom: 5 },
-shortcutLabel: { fontSize: 10, fontWeight: '700' },
-feedHeading: { marginTop: 4, marginBottom: 12 },
-feedTitle: { fontSize: 21, fontWeight: '800' },
-feedCaption: { fontSize: 12, marginTop: 3 },
+shortcutIcon: {
+fontSize: 22,
+marginBottom: 5,
+},
+shortcutLabel: {
+fontSize: 10,
+fontWeight: '700',
+},
+feedHeading: {
+marginTop: 4,
+marginBottom: 12,
+},
+feedTitle: {
+fontSize: 21,
+fontWeight: '800',
+},
+feedCaption: {
+fontSize: 12,
+marginTop: 3,
+},
 feedGrid: {
 flexDirection: 'row',
 flexWrap: 'wrap',
@@ -746,26 +823,42 @@ padding: 13,
 shadowRadius: 9,
 elevation: 3,
 },
-halfPost: { width: '48%' },
-fullPost: { width: '100%' },
+halfPost: {
+width: '48%',
+},
+fullPost: {
+width: '100%',
+},
 postAuthor: {
 fontSize: 12,
 fontWeight: '800',
 marginBottom: 9,
 },
-postBody: { fontSize: 14, lineHeight: 20 },
-postFooter: { fontSize: 10, marginTop: 14 },
+postBody: {
+fontSize: 14,
+lineHeight: 20,
+},
+postFooter: {
+fontSize: 10,
+marginTop: 14,
+},
 emptyCard: {
 borderWidth: 1,
 borderRadius: 16,
 padding: 18,
 },
-emptyText: { fontSize: 13, lineHeight: 20 },
+emptyText: {
+fontSize: 13,
+lineHeight: 20,
+},
 noteCard: {
 borderWidth: 1,
 borderRadius: 14,
 padding: 12,
 marginTop: 22,
 },
-noteText: { fontSize: 11, lineHeight: 17 },
+noteText: {
+fontSize: 11,
+lineHeight: 17,
+},
 });

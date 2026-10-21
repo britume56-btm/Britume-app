@@ -50,9 +50,81 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    setLoading(true);
+  
+const loadProfile = useCallback(async () => {
+  setLoading(true);
 
+  try {
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error) throw error;
+
+    const user = data.user;
+
+    if (!user) {
+      setProfile(null);
+      setUsername('');
+      setDisplayName('');
+      setAvatarPath(null);
+      setAvatarUrl(null);
+      return;
+    }
+
+    // First, try loading the existing profile.
+    let profileData = await fetchProfile(user.id);
+
+    // If the user is authenticated but has no profile row,
+    // create one instead of showing a misleading sign-in message.
+    if (!profileData) {
+      const emailName = user.email?.split('@')[0] ?? 'britumeuser';
+
+      const safeBase =
+        emailName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) ||
+        'britumeuser';
+
+      const generatedUsername =
+        `${safeBase}_${user.id.replace(/-/g, '').slice(-6)}`;
+
+      const createdProfile = await saveProfile({
+        id: user.id,
+        username: generatedUsername,
+        display_name:
+          user.user_metadata?.display_name ||
+          user.user_metadata?.full_name ||
+          emailName,
+        avatar_path: null,
+        phone: user.phone ?? null,
+      });
+
+      if (!createdProfile) {
+        throw new Error(
+          'Your account is signed in, but BRITUME could not create your profile. Check the Supabase profiles table and its permissions.'
+        );
+      }
+
+      profileData = createdProfile;
+    }
+
+    setProfile(profileData);
+    setUsername(profileData.username ?? '');
+    setDisplayName(profileData.display_name ?? '');
+
+    const path =
+      profileData.avatar_path ??
+      getLegacyAvatarObjectPath(profileData.avatar_url, user.id);
+
+    setAvatarPath(path);
+  } catch (error) {
+    Alert.alert(
+      'Profile unavailable',
+      error instanceof Error
+        ? error.message
+        : 'Please check your connection and try again.'
+    );
+  } finally {
+    setLoading(false);
+  }
+}, []);
     try {
       const { data, error } = await supabase.auth.getUser();
 

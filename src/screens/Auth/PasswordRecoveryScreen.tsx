@@ -1,155 +1,51 @@
 
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../../../lib/supabase';
 
-type AuthMode = 'welcome' | 'signup' | 'signin' | 'recover';
+type Props = {
+  onComplete: () => void;
+};
 
-export default function AuthGate() {
-  const [mode, setMode] = useState<AuthMode>('welcome');
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+export default function PasswordRecoveryScreen({ onComplete }: Props) {
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const isEmail = (value: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-
-  const isPhone = (value: string) =>
-    /^\+[1-9]\d{7,14}$/.test(value.trim());
-
-  const validateIdentifier = () => {
-    const value = identifier.trim();
-
-    if (!value) {
-      Alert.alert('Required', 'Enter your email address or phone number.');
-      return false;
-    }
-
-    if (!isEmail(value) && !isPhone(value)) {
+  const handleResetPassword = async () => {
+    if (newPassword.length < 8) {
       Alert.alert(
-        'Invalid details',
-        'Enter a valid email address or an international phone number, such as +267XXXXXXXX.'
+        'Password too short',
+        'Use at least 8 characters for your new password.'
       );
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleSignUp = async () => {
-    if (!validateIdentifier()) return;
-
-    if (password.length < 6) {
-      Alert.alert('Password required', 'Use at least 6 characters.');
       return;
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Passwords do not match', 'Enter the same password twice.');
+    if (!/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      Alert.alert(
+        'Stronger password needed',
+        'Include at least one letter and one number.'
+      );
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const value = identifier.trim();
-
-      const result = isEmail(value)
-        ? await supabase.auth.signUp({
-            email: value.toLowerCase(),
-            password,
-            options: {
-              emailRedirectTo: 'britume://auth/callback',
-            },
-          })
-        : await supabase.auth.signUp({
-            phone: value,
-            password,
-          });
-
-      if (result.error) throw result.error;
-
-      if (isEmail(value)) {
-        Alert.alert(
-          'Check your email',
-          'If email confirmation is enabled, open the confirmation link to activate your BRITUME account.'
-        );
-      } else {
-        Alert.alert(
-          'Phone verification required',
-          'Your phone account may require an SMS verification code. Complete verification before signing in.'
-        );
-      }
-
-      setPassword('');
-      setConfirmPassword('');
-      setMode('signin');
-    } catch (error: unknown) {
+    if (newPassword !== confirmPassword) {
       Alert.alert(
-        'Registration failed',
-        error instanceof Error ? error.message : 'Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignIn = async () => {
-    if (!validateIdentifier()) return;
-
-    if (!password) {
-      Alert.alert('Password required', 'Enter your password.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const value = identifier.trim();
-
-      const result = isEmail(value)
-        ? await supabase.auth.signInWithPassword({
-            email: value.toLowerCase(),
-            password,
-          })
-        : await supabase.auth.signInWithPassword({
-            phone: value,
-            password,
-          });
-
-      if (result.error) throw result.error;
-
-      // The app's existing Supabase auth listener should handle
-      // navigation after a successful sign-in.
-    } catch (error: unknown) {
-      Alert.alert(
-        'Sign-in failed',
-        error instanceof Error ? error.message : 'Check your details and try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRecovery = async () => {
-    const email = identifier.trim().toLowerCase();
-
-    if (!isEmail(email)) {
-      Alert.alert(
-        'Email required',
-        'Enter the email address registered to your BRITUME account.'
+        'Passwords do not match',
+        'Enter the same password in both fields.'
       );
       return;
     }
@@ -157,95 +53,49 @@ export default function AuthGate() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'britume://auth/callback',
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword,
       });
 
       if (error) throw error;
 
+      if (!data.user) {
+        throw new Error(
+          'No authenticated recovery session was found. Open the latest recovery email and try again.'
+        );
+      }
+
+      setNewPassword('');
+      setConfirmPassword('');
+
       Alert.alert(
-        'Check your email',
-        'If an account matches that address, password-reset instructions will be sent. Check your inbox and spam folder.'
+        'Password updated',
+        'Your BRITUME password has been changed successfully. Please sign in again with your new password.',
+        [
+          {
+            text: 'Continue to sign in',
+            onPress: async () => {
+              try {
+                await supabase.auth.signOut();
+              } finally {
+                onComplete();
+              }
+            },
+          },
+        ],
+        { cancelable: false }
       );
     } catch (error: unknown) {
       Alert.alert(
-        'Recovery failed',
-        error instanceof Error ? error.message : 'Please try again later.'
+        'Password reset failed',
+        error instanceof Error
+          ? error.message
+          : 'Please reopen your recovery email and try again.'
       );
     } finally {
       setLoading(false);
     }
   };
-
-  const changeMode = (nextMode: AuthMode) => {
-    setPassword('');
-    setConfirmPassword('');
-    setMode(nextMode);
-  };
-
-  const Field = ({
-    label,
-    value,
-    onChangeText,
-    placeholder,
-    secureTextEntry = false,
-    keyboardType = 'default' as 'default' | 'email-address' | 'phone-pad',
-    autoCapitalize = 'none' as 'none' | 'sentences' | 'words' | 'characters',
-  }: {
-    label: string;
-    value: string;
-    onChangeText: (text: string) => void;
-    placeholder: string;
-    secureTextEntry?: boolean;
-    keyboardType?: 'default' | 'email-address' | 'phone-pad';
-    autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  }) => (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#777777"
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        editable={!loading}
-        selectionColor="#D4AF37"
-        style={styles.input}
-      />
-    </View>
-  );
-
-  const Button = ({
-    title,
-    onPress,
-    secondary = false,
-  }: {
-    title: string;
-    onPress: () => void;
-    secondary?: boolean;
-  }) => (
-    <Pressable
-      onPress={onPress}
-      disabled={loading}
-      style={[styles.button, secondary && styles.secondaryButton]}
-    >
-      {loading && !secondary ? (
-        <ActivityIndicator color="#000000" />
-      ) : (
-        <Text
-          style={[
-            styles.buttonText,
-            secondary && styles.secondaryButtonText,
-          ]}
-        >
-          {title}
-        </Text>
-      )}
-    </Pressable>
-  );
 
   return (
     <KeyboardAvoidingView
@@ -256,6 +106,8 @@ export default function AuthGate() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.glow} />
+
         <View style={styles.logoCircle}>
           <Text style={styles.logoLetter}>B</Text>
         </View>
@@ -263,245 +115,360 @@ export default function AuthGate() {
         <Text style={styles.brand}>BRITUME</Text>
         <Text style={styles.tagline}>SEE BEYOND. MOVE FORWARD.</Text>
 
-        {mode === 'welcome' && (
-          <View style={styles.panel}>
-            <Text style={styles.heading}>Welcome to BRITUME</Text>
-            <Text style={styles.description}>
-              Your account. Your community. Your future.
-            </Text>
-            <Button title="Create account" onPress={() => changeMode('signup')} />
-            <Button
-              title="Sign in"
-              secondary
-              onPress={() => changeMode('signin')}
-            />
+        <View style={styles.glassCard}>
+          <View style={styles.topLine} />
+
+          <View style={styles.iconCircle}>
+            <Text style={styles.keyIcon}>✦</Text>
           </View>
-        )}
 
-        {mode === 'signup' && (
-          <View style={styles.panel}>
-            <Text style={styles.heading}>Create your account</Text>
-            <Text style={styles.description}>
-              Register using an email address or an international phone number.
-            </Text>
+          <Text style={styles.heading}>Create a new password</Text>
 
-            <Field
-              label="Email or phone number"
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder="Email or +267XXXXXXXX"
-            />
-            <Field
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="At least 6 characters"
-              secureTextEntry
-            />
-            <Field
-              label="Confirm password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Enter password again"
-              secureTextEntry
-            />
+          <Text style={styles.description}>
+            Secure your BRITUME account with a new password.
+            Your new password must contain at least 8 characters,
+            including a letter and a number.
+          </Text>
 
-            <Button title="Create account" onPress={handleSignUp} />
-            <Button
-              title="Already have an account? Sign in"
-              secondary
-              onPress={() => changeMode('signin')}
-            />
-          </View>
-        )}
+          <Text style={styles.label}>NEW PASSWORD</Text>
 
-        {mode === 'signin' && (
-          <View style={styles.panel}>
-            <Text style={styles.heading}>Sign in</Text>
-            <Text style={styles.description}>
-              Continue with your registered email or phone number.
-            </Text>
-
-            <Field
-              label="Email or phone number"
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder="Email or +267XXXXXXXX"
-            />
-            <Field
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Your password"
-              secureTextEntry
+          <View style={styles.inputWrap}>
+            <TextInput
+              style={styles.input}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="Enter new password"
+              placeholderTextColor="#88858C"
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+              selectionColor="#E6C66D"
+              textContentType="newPassword"
+              accessibilityLabel="New password"
             />
 
             <Pressable
-              onPress={() => changeMode('recover')}
-              style={styles.forgotButton}
+              onPress={() => setShowPassword((value) => !value)}
+              disabled={loading}
+              style={styles.eyeButton}
+              accessibilityRole="button"
+              accessibilityLabel={
+                showPassword ? 'Hide password' : 'Show password'
+              }
             >
-              <Text style={styles.goldLink}>Forgot password?</Text>
+              <Text style={styles.eyeText}>
+                {showPassword ? 'HIDE' : 'SHOW'}
+              </Text>
             </Pressable>
-
-            <Button title="Sign in" onPress={handleSignIn} />
-            <Button
-              title="Create a new account"
-              secondary
-              onPress={() => changeMode('signup')}
-            />
           </View>
-        )}
 
-        {mode === 'recover' && (
-          <View style={styles.panel}>
-            <Text style={styles.heading}>Password recovery</Text>
-            <Text style={styles.description}>
-              Enter the email address linked to your account. We will request a
-              password-reset email from Supabase.
+          <Text style={styles.label}>CONFIRM NEW PASSWORD</Text>
+
+          <View style={styles.inputWrap}>
+            <TextInput
+              style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Enter password again"
+              placeholderTextColor="#88858C"
+              secureTextEntry={!showConfirm}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+              selectionColor="#E6C66D"
+              textContentType="newPassword"
+              accessibilityLabel="Confirm new password"
+              onSubmitEditing={handleResetPassword}
+              returnKeyType="done"
+            />
+
+            <Pressable
+              onPress={() => setShowConfirm((value) => !value)}
+              disabled={loading}
+              style={styles.eyeButton}
+              accessibilityRole="button"
+              accessibilityLabel={
+                showConfirm
+                  ? 'Hide confirmation password'
+                  : 'Show confirmation password'
+              }
+            >
+              <Text style={styles.eyeText}>
+                {showConfirm ? 'HIDE' : 'SHOW'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.securityNote}>
+            <Text style={styles.securityIcon}>◆</Text>
+            <Text style={styles.securityText}>
+              Your password is updated securely through Supabase
+              Authentication.
             </Text>
-
-            <Field
-              label="Registered email address"
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder="you@example.com"
-              keyboardType="email-address"
-            />
-
-            <Button
-              title="Send recovery email"
-              onPress={handleRecovery}
-            />
-            <Button
-              title="Back to sign in"
-              secondary
-              onPress={() => changeMode('signin')}
-            />
           </View>
-        )}
 
-        <Text style={styles.footer}>
-          BRITUME © 2026. Built to move forward.
-        </Text>
+          <Pressable
+            onPress={handleResetPassword}
+            disabled={loading}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && !loading && styles.pressedButton,
+              loading && styles.disabledButton,
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color="#100D05" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                RESET PASSWORD
+              </Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={onComplete}
+            disabled={loading}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>
+              Return to BRITUME
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.footerRow}>
+          <View style={styles.footerDot} />
+          <Text style={styles.footer}>
+            BRITUME ACCOUNT SECURITY
+          </Text>
+          <View style={styles.footerDot} />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+const GOLD = '#E6C66D';
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#050608',
   },
   container: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     paddingVertical: 36,
+    overflow: 'hidden',
+  },
+  glow: {
+    position: 'absolute',
+    top: 100,
+    alignSelf: 'center',
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(214, 171, 63, 0.07)',
   },
   logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: '#D4AF37',
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 1.5,
+    borderColor: 'rgba(230, 198, 109, 0.85)',
+    backgroundColor: 'rgba(230, 198, 109, 0.08)',
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    shadowColor: GOLD,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
   logoLetter: {
-    color: '#D4AF37',
-    fontSize: 42,
+    color: GOLD,
+    fontSize: 39,
     fontWeight: '900',
   },
   brand: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '900',
     letterSpacing: 5,
     textAlign: 'center',
   },
   tagline: {
-    color: '#D4AF37',
+    color: GOLD,
     fontSize: 10,
     letterSpacing: 2,
     textAlign: 'center',
     marginTop: 8,
-    marginBottom: 32,
+    marginBottom: 30,
   },
-  panel: {
+  glassCard: {
     width: '100%',
     maxWidth: 460,
     alignSelf: 'center',
+    padding: 22,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(230, 198, 109, 0.30)',
+    backgroundColor: 'rgba(24, 24, 28, 0.88)',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 9,
+  },
+  topLine: {
+    position: 'absolute',
+    top: 0,
+    left: 24,
+    right: 24,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(230, 198, 109, 0.35)',
+    backgroundColor: 'rgba(230, 198, 109, 0.09)',
+    marginBottom: 18,
+  },
+  keyIcon: {
+    color: GOLD,
+    fontSize: 26,
+    fontWeight: '700',
   },
   heading: {
     color: '#FFFFFF',
-    fontSize: 25,
+    fontSize: 24,
     fontWeight: '800',
     marginBottom: 10,
   },
   description: {
-    color: '#AAAAAA',
-    fontSize: 14,
+    color: '#B9B9C0',
+    fontSize: 13,
     lineHeight: 21,
-    marginBottom: 24,
-  },
-  field: {
-    marginBottom: 17,
+    marginBottom: 25,
   },
   label: {
-    color: '#D4AF37',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
+    color: GOLD,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    marginBottom: 9,
+  },
+  inputWrap: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    marginBottom: 20,
+    paddingLeft: 14,
   },
   input: {
+    flex: 1,
+    minWidth: 0,
     minHeight: 52,
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#383020',
-    borderRadius: 10,
-    paddingHorizontal: 15,
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
+    paddingVertical: 12,
   },
-  button: {
-    minHeight: 52,
-    borderRadius: 10,
-    backgroundColor: '#D4AF37',
+  eyeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  eyeText: {
+    color: GOLD,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(230, 198, 109, 0.14)',
+    backgroundColor: 'rgba(230, 198, 109, 0.045)',
+    marginTop: 1,
+    marginBottom: 20,
+  },
+  securityIcon: {
+    color: GOLD,
+    fontSize: 11,
+    marginRight: 9,
+    marginTop: 2,
+  },
+  securityText: {
+    flex: 1,
+    color: '#BDBDC4',
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  primaryButton: {
+    minHeight: 54,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: GOLD,
     paddingHorizontal: 16,
-    marginTop: 10,
+    marginTop: 2,
   },
-  buttonText: {
-    color: '#000000',
-    fontSize: 15,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  secondaryButton: {
-    backgroundColor: '#000000',
-    borderWidth: 1,
-    borderColor: '#D4AF37',
-  },
-  secondaryButtonText: {
-    color: '#D4AF37',
-  },
-  forgotButton: {
-    alignSelf: 'flex-end',
-    paddingVertical: 8,
-  },
-  goldLink: {
-    color: '#D4AF37',
+  primaryButtonText: {
+    color: '#100D05',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '900',
+    letterSpacing: 1.1,
+  },
+  pressedButton: {
+    opacity: 0.82,
+    transform: [{ scale: 0.99 }],
+  },
+  disabledButton: {
+    opacity: 0.65,
+  },
+  backButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 17,
+  },
+  backButtonText: {
+    color: '#D0C6A8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 25,
+    gap: 10,
+  },
+  footerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: GOLD,
   },
   footer: {
-    color: '#666666',
-    textAlign: 'center',
-    fontSize: 11,
-    marginTop: 38,
+    color: '#777780',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
 });

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
@@ -50,87 +49,18 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  
-const loadProfile = useCallback(async () => {
-  setLoading(true);
+  // Load the signed-in user's profile and recover a missing profile row.
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
 
-  try {
-    const { data, error } = await supabase.auth.getUser();
-
-    if (error) throw error;
-
-    const user = data.user;
-
-    if (!user) {
-      setProfile(null);
-      setUsername('');
-      setDisplayName('');
-      setAvatarPath(null);
-      setAvatarUrl(null);
-      return;
-    }
-
-    // First, try loading the existing profile.
-    let profileData = await fetchProfile(user.id);
-
-    // If the user is authenticated but has no profile row,
-    // create one instead of showing a misleading sign-in message.
-    if (!profileData) {
-      const emailName = user.email?.split('@')[0] ?? 'britumeuser';
-
-      const safeBase =
-        emailName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) ||
-        'britumeuser';
-
-      const generatedUsername =
-        `${safeBase}_${user.id.replace(/-/g, '').slice(-6)}`;
-
-      const createdProfile = await saveProfile({
-        id: user.id,
-        username: generatedUsername,
-        display_name:
-          user.user_metadata?.display_name ||
-          user.user_metadata?.full_name ||
-          emailName,
-        avatar_path: null,
-        phone: user.phone ?? null,
-      });
-
-      if (!createdProfile) {
-        throw new Error(
-          'Your account is signed in, but BRITUME could not create your profile. Check the Supabase profiles table and its permissions.'
-        );
-      }
-
-      profileData = createdProfile;
-    }
-
-    setProfile(profileData);
-    setUsername(profileData.username ?? '');
-    setDisplayName(profileData.display_name ?? '');
-
-    const path =
-      profileData.avatar_path ??
-      getLegacyAvatarObjectPath(profileData.avatar_url, user.id);
-
-    setAvatarPath(path);
-  } catch (error) {
-    Alert.alert(
-      'Profile unavailable',
-      error instanceof Error
-        ? error.message
-        : 'Please check your connection and try again.'
-    );
-  } finally {
-    setLoading(false);
-  }
-}, []);
     try {
       const { data, error } = await supabase.auth.getUser();
 
       if (error) throw error;
 
-      if (!data.user) {
+      const user = data.user;
+
+      if (!user) {
         setProfile(null);
         setUsername('');
         setDisplayName('');
@@ -139,18 +69,43 @@ const loadProfile = useCallback(async () => {
         return;
       }
 
-      const profileData = await fetchProfile(data.user.id);
+      let profileData = await fetchProfile(user.id);
+
+      if (!profileData) {
+        const emailName = user.email?.split('@')[0] || 'BRITUME User';
+
+        const safeBase =
+          emailName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) ||
+          'britumeuser';
+
+        const generatedUsername =
+          `${safeBase}_${user.id.replace(/-/g, '').slice(-6)}`;
+
+        profileData = await saveProfile({
+          id: user.id,
+          username: generatedUsername,
+          display_name:
+            user.user_metadata?.display_name ||
+            user.user_metadata?.full_name ||
+            emailName,
+          avatar_path: null,
+          phone: user.phone ?? null,
+        });
+
+        if (!profileData) {
+          throw new Error(
+            'Could not load or create your profile. Check your Supabase profiles table, permissions, and username constraints.'
+          );
+        }
+      }
 
       setProfile(profileData);
-      setUsername(profileData?.username ?? '');
-      setDisplayName(profileData?.display_name ?? '');
+      setUsername(profileData.username ?? '');
+      setDisplayName(profileData.display_name ?? '');
 
       const path =
-        profileData?.avatar_path ??
-        getLegacyAvatarObjectPath(
-          profileData?.avatar_url,
-          data.user.id
-        );
+        profileData.avatar_path ??
+        getLegacyAvatarObjectPath(profileData.avatar_url, user.id);
 
       setAvatarPath(path);
     } catch (error) {
@@ -158,7 +113,7 @@ const loadProfile = useCallback(async () => {
         'Profile unavailable',
         error instanceof Error
           ? error.message
-          : 'Please try again.'
+          : 'Please check your connection and try again.'
       );
     } finally {
       setLoading(false);
@@ -402,7 +357,7 @@ const loadProfile = useCallback(async () => {
         <StatusBar barStyle="light-content" />
         <Text style={styles.emptyTitle}>Your universe awaits</Text>
         <Text style={styles.mutedText}>
-          Sign in to load your BRITUME profile.
+          Sign in to load your BRITUME profile, or try loading it again.
         </Text>
         <Pressable
           onPress={() => void loadProfile()}

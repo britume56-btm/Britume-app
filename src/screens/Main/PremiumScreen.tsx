@@ -1,231 +1,473 @@
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { supabase } from '../../../lib/supabase';
-import { AdSlot } from '../../components/monetization/MonetizationSlots';
-import {
-  getPremiumEntitlement,
-  hasPremiumAccess,
-} from '../../services/launchFeatureService';
-import type { PremiumEntitlement } from '../../services/launchFeatureService';
-import {
-  getBillingProviderStatus,
-  purchasePremium,
-  restorePremiumPurchases,
-} from '../../services/billingService';
-import { useAppTheme } from '../../theme/AppThemeContext';
 
-const BENEFITS = [
-  'Nebula theme access while a verified entitlement is active',
-  'Membership state comes from the account entitlement record, not local purchase state',
-  'No other Premium-only features are enabled in this release',
-];
+import React, { useState } from "react";
+import {
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+type Plan = "monthly" | "yearly";
 
 export default function PremiumScreen() {
-  const { palette } = useAppTheme();
-  const [entitlement, setEntitlement] = useState<PremiumEntitlement | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [restoring, setRestoring] = useState(false);
-  const [purchasing, setPurchasing] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [selectedPlan, setSelectedPlan] =
+    useState<Plan>("monthly");
 
-  const load = useCallback(async (): Promise<boolean> => {
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        throw new Error('Sign in again to view your account status.');
-      }
-      setEntitlement(await getPremiumEntitlement(data.user.id));
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Premium status could not be loaded.');
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [adUnlocked, setAdUnlocked] =
+    useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  const [isPremium, setIsPremium] =
+    useState(false);
 
-  const active = entitlement ? hasPremiumAccess(entitlement) : false;
-  const billingStatus = getBillingProviderStatus();
-  const billingConfigured = billingStatus.configured;
-  const expired =
-    entitlement?.expires_at !== null &&
-    entitlement?.expires_at !== undefined &&
-    Date.parse(entitlement.expires_at) <= Date.now();
+  const colors = {
+    background: "#080B16",
+    card: "#11182B",
+    blue: "#28A8FF",
+    purple: "#9B5CFF",
+    gold: "#FFD166",
+    white: "#FFFFFF",
+    muted: "#A8B1C7",
+    border: "#263451",
+  };
 
-  async function refreshMembership() {
-    if (restoring) {
-      return;
-    }
-    setRestoring(true);
-    setError('');
-    setNotice('');
-    try {
-      const restored = await restorePremiumPurchases();
-      const loaded = await load();
-      if (loaded) {
-        setNotice(
-          restored
-            ? 'Store restore requested. Access still comes from the verified BRITUME entitlement.'
-            : 'Entitlement refreshed. Store restore is unavailable until production billing is configured.'
-        );
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Membership could not be refreshed.');
-    } finally {
-      setRestoring(false);
-    }
-  }
+  const showAdMessage = () => {
+    Alert.alert(
+      "BRITUME Rewards",
+      "Rewarded ads are not connected yet. Connect a supported advertising SDK before users can earn rewards."
+    );
+  };
 
-  async function startPurchase() {
-    const product = billingStatus.product;
-    if (!product || !billingConfigured || purchasing || restoring) {
-      return;
-    }
-    setPurchasing(true);
-    setError('');
-    setNotice('');
-    try {
-      const outcome = await purchasePremium(product.id);
-      if (outcome === 'cancelled') {
-        await load();
-        setNotice('Purchase cancelled. No local membership was granted.');
-        return;
-      }
-      const loaded = await load();
-      if (!loaded) {
-        setNotice('Store verification returned, but BRITUME could not refresh the account entitlement. Retry the status check.');
-      } else {
-        setNotice('Store transaction verified. The membership status shown above is refreshed from BRITUME.');
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The store purchase could not be completed.');
-    } finally {
-      setPurchasing(false);
-    }
-  }
+  const showPurchaseMessage = () => {
+    Alert.alert(
+      "BRITUME Premium",
+      "Purchases are not connected yet. Add Google Play Billing or a supported subscription SDK before accepting payments."
+    );
+  };
+
+  const features = [
+    "Exclusive BRITUME themes",
+    "Advanced personalization",
+    "Premium customization options",
+    "Reduced ads where supported",
+  ];
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: palette.background }]}>
-      <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • MEMBERSHIP</Text>
-      <Text style={[styles.title, { color: palette.text }]}>Premium</Text>
-      <View style={[styles.statusCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-        <Text style={[styles.statusLabel, { color: palette.muted }]}>ACCOUNT STATUS</Text>
-        {loading ? (
-          <ActivityIndicator color={palette.accent} style={styles.spinner} />
-        ) : (
-          <Text style={[styles.status, { color: active ? palette.accent : palette.text }]}>
-            {active
-              ? entitlement?.status === 'grace_period'
-                ? 'Premium · grace period'
-                : entitlement?.status === 'canceled'
-                  ? 'Premium · active through period end'
-                  : 'Premium active'
-              : expired
-                ? 'Premium expired'
-                : entitlement?.status === 'past_due'
-                  ? 'Payment needs attention'
-                  : entitlement?.status === 'canceled'
-                    ? 'Membership canceled'
-                    : 'Free plan'}
-          </Text>
-        )}
-        {entitlement?.expires_at ? (
-          <Text style={[styles.muted, { color: palette.muted }]}>
-            Current period ends {new Date(entitlement.expires_at).toLocaleDateString()}.
-          </Text>
-        ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {notice ? <Text style={[styles.notice, { color: palette.muted }]}>{notice}</Text> : null}
-        {!loading && entitlement?.provider ? (
-          <Text style={[styles.muted, { color: palette.muted }]}>
-            Provider: {entitlement.provider}{entitlement.product_id ? ` · ${entitlement.product_id}` : ''}
-          </Text>
-        ) : null}
-      </View>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        { backgroundColor: colors.background },
+      ]}
+    >
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={colors.background}
+      />
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={loading || restoring}
-        onPress={() => void refreshMembership()}
-        style={[styles.refreshButton, { borderColor: palette.border }, (loading || restoring) && styles.disabled]}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.refreshText, { color: palette.accent }]}>
-          {restoring ? 'Checking membership…' : 'Refresh / restore membership'}
-        </Text>
-      </Pressable>
+        <View style={styles.header}>
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>B</Text>
+          </View>
 
-      <Text style={[styles.sectionTitle, { color: palette.text }]}>What Premium can provide</Text>
-      {BENEFITS.map((benefit) => (
-        <View key={benefit} style={[styles.benefit, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          <Text style={[styles.bullet, { color: palette.accent }]}>✦</Text>
-          <Text style={[styles.muted, { color: palette.muted }]}>{benefit}</Text>
+          <Text style={styles.brand}>BRITUME</Text>
+          <Text style={styles.heading}>PREMIUM</Text>
+
+          <Text style={styles.subtitle}>
+            More freedom. More creativity.
+            {"\n"}More ways to make BRITUME yours.
+          </Text>
         </View>
-      ))}
 
-      <View style={[styles.setupCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-        <Text style={[styles.setupTitle, { color: palette.text }]}>
-          {billingConfigured ? 'Billing provider available' : 'Production billing is not configured'}
-        </Text>
-        {billingStatus.product ? (
-          <Text style={[styles.muted, { color: palette.muted }]}>
-            {billingStatus.product.title} · {billingStatus.product.formattedPrice}
-          </Text>
-        ) : null}
-        <Text style={[styles.muted, { color: palette.muted }]}>
-          {billingConfigured
-            ? 'Purchases are routed through the configured store adapter and trusted server-side receipt verification.'
-            : 'Purchasing requires production Google Play billing, store products, and trusted server-side receipt verification. No purchase has been started or completed.'}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !billingConfigured || purchasing || loading || restoring }}
-          disabled={!billingConfigured || purchasing || loading || restoring}
-          onPress={() => void startPurchase()}
-          style={[styles.purchaseButton, { backgroundColor: palette.accent, opacity: !billingConfigured || purchasing || loading || restoring ? 0.5 : 1 }]}
+        <View
+          style={[
+            styles.heroCard,
+            { borderColor: colors.purple },
+          ]}
         >
-          <Text style={styles.purchaseText}>
-            {purchasing
-              ? 'Verifying with store…'
-              : billingStatus.product
-                ? `Subscribe · ${billingStatus.product.formattedPrice}`
-                : 'Premium purchase unavailable'}
+          <Text style={styles.crown}>♛</Text>
+
+          <Text style={styles.heroTitle}>
+            Unlock your BRITUME
           </Text>
-        </Pressable>
-      </View>
-      <AdSlot label="Premium sponsor slot" />
-    </ScrollView>
+
+          <Text style={styles.description}>
+            Discover exclusive themes, enhanced
+            personalization, and premium benefits.
+          </Text>
+
+          {features.map((feature) => (
+            <View key={feature} style={styles.featureRow}>
+              <Text style={styles.check}>✓</Text>
+              <Text style={styles.featureText}>
+                {feature}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          CHOOSE YOUR PLAN
+        </Text>
+
+        <TouchableOpacity
+          accessibilityRole="radio"
+          accessibilityState={{
+            checked: selectedPlan === "monthly",
+          }}
+          onPress={() => setSelectedPlan("monthly")}
+          style={[
+            styles.planCard,
+            selectedPlan === "monthly" &&
+              styles.selectedPlan,
+          ]}
+        >
+          <View style={styles.planInfo}>
+            <Text style={styles.planTitle}>
+              Monthly Premium
+            </Text>
+            <Text style={styles.planDescription}>
+              Flexible monthly membership
+            </Text>
+          </View>
+
+          <View style={styles.radio}>
+            {selectedPlan === "monthly" && (
+              <View style={styles.radioInner} />
+            )}
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="radio"
+          accessibilityState={{
+            checked: selectedPlan === "yearly",
+          }}
+          onPress={() => setSelectedPlan("yearly")}
+          style={[
+            styles.planCard,
+            selectedPlan === "yearly" &&
+              styles.selectedPlan,
+          ]}
+        >
+          <View style={styles.planInfo}>
+            <Text style={styles.planTitle}>
+              Yearly Premium
+            </Text>
+            <Text style={styles.planDescription}>
+              Annual membership
+            </Text>
+          </View>
+
+          <View style={styles.radio}>
+            {selectedPlan === "yearly" && (
+              <View style={styles.radioInner} />
+            )}
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.premiumButton}
+          onPress={showPurchaseMessage}
+        >
+          <Text style={styles.premiumButtonText}>
+            {isPremium
+              ? "PREMIUM ACTIVE"
+              : "GET BRITUME PREMIUM"}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>
+          EARN THEMED REWARDS
+        </Text>
+
+        <View style={styles.rewardCard}>
+          <Text style={styles.rewardIcon}>🎨</Text>
+
+          <Text style={styles.rewardTitle}>
+            Discover a new theme
+          </Text>
+
+          <Text style={styles.description}>
+            Watch an optional rewarded ad to unlock
+            eligible themes when available.
+          </Text>
+
+          {adUnlocked && (
+            <Text style={styles.unlockedText}>
+              Demo reward selected. No theme has
+              actually been unlocked yet.
+            </Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.rewardButton}
+            onPress={showAdMessage}
+          >
+            <Text style={styles.rewardButtonText}>
+              WATCH AD FOR A REWARD
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.adInfo}>
+          <Text style={styles.adInfoTitle}>
+            BRITUME AD EXPERIENCE
+          </Text>
+
+          <Text style={styles.adInfoText}>
+            Selected video ads and optional theme
+            rewards. Target 5–40 seconds where
+            supported by the advertising provider.
+            Actual durations depend on the ad format.
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert(
+              "Restore purchases",
+              "Purchase restoration will work after billing is integrated."
+            )
+          }
+          style={styles.restoreButton}
+        >
+          <Text style={styles.restoreText}>
+            Restore purchases
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.footer}>
+          Subscriptions and ad rewards require
+          verification before benefits are granted.
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, paddingBottom: 36 },
-  kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 1.6, marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '800', marginBottom: 16 },
-  statusCard: { borderRadius: 16, borderWidth: 1, padding: 17 },
-  statusLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  status: { fontSize: 20, fontWeight: '900', marginTop: 7 },
-  spinner: { alignSelf: 'flex-start', marginTop: 12 },
-  sectionTitle: { fontSize: 17, fontWeight: '800', marginBottom: 9, marginTop: 20 },
-  benefit: { alignItems: 'flex-start', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 9, marginBottom: 8, padding: 12 },
-  bullet: { fontSize: 15, fontWeight: '900' },
-  muted: { flex: 1, fontSize: 13, lineHeight: 19, marginTop: 4 },
-  setupCard: { borderRadius: 14, borderWidth: 1, marginTop: 13, padding: 14 },
-  setupTitle: { fontSize: 15, fontWeight: '800' },
-  purchaseButton: { alignItems: 'center', borderRadius: 10, justifyContent: 'center', marginTop: 14, minHeight: 43, paddingHorizontal: 12 },
-  purchaseText: { color: '#090d15', fontSize: 12, fontWeight: '900' },
-  error: { color: '#f18e8e', fontSize: 12, marginTop: 9 },
-  notice: { fontSize: 12, lineHeight: 18, marginTop: 8 },
-  refreshButton: { alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, marginTop: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  refreshText: { fontSize: 12, fontWeight: '800' },
-  disabled: { opacity: 0.55 },
+  safeArea: {
+    flex: 1,
+  },
+  container: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 26,
+  },
+  logo: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 2,
+    borderColor: "#FFD166",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  logoText: {
+    color: "#FFD166",
+    fontSize: 38,
+    fontWeight: "900",
+  },
+  brand: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: 5,
+  },
+  heading: {
+    color: "#FFD166",
+    fontSize: 28,
+    fontWeight: "900",
+    marginTop: 16,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    color: "#A8B1C7",
+    textAlign: "center",
+    lineHeight: 23,
+    marginTop: 10,
+  },
+  heroCard: {
+    backgroundColor: "#11182B",
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 22,
+    marginBottom: 28,
+  },
+  crown: {
+    fontSize: 36,
+    color: "#FFD166",
+    marginBottom: 8,
+  },
+  heroTitle: {
+    fontSize: 23,
+    color: "#FFFFFF",
+    fontWeight: "800",
+    marginBottom: 10,
+  },
+  description: {
+    color: "#A8B1C7",
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  check: {
+    color: "#28A8FF",
+    fontSize: 19,
+    fontWeight: "900",
+    marginRight: 12,
+  },
+  featureText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    flex: 1,
+  },
+  sectionTitle: {
+    color: "#A8B1C7",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 2,
+    marginBottom: 14,
+  },
+  planCard: {
+    backgroundColor: "#11182B",
+    borderWidth: 1,
+    borderColor: "#263451",
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  selectedPlan: {
+    borderColor: "#28A8FF",
+    backgroundColor: "#12233B",
+  },
+  planInfo: {
+    flex: 1,
+  },
+  planTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  planDescription: {
+    color: "#A8B1C7",
+    marginTop: 6,
+    fontSize: 13,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#28A8FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#28A8FF",
+  },
+  premiumButton: {
+    backgroundColor: "#FFD166",
+    padding: 17,
+    alignItems: "center",
+    borderRadius: 14,
+    marginTop: 6,
+    marginBottom: 30,
+  },
+  premiumButtonText: {
+    color: "#11182B",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  rewardCard: {
+    backgroundColor: "#11182B",
+    borderColor: "#263451",
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "flex-start",
+  },
+  rewardIcon: {
+    fontSize: 32,
+    marginBottom: 10,
+  },
+  rewardTitle: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    fontWeight: "800",
+    marginBottom: 10,
+  },
+  rewardButton: {
+    width: "100%",
+    backgroundColor: "#7448D9",
+    padding: 16,
+    alignItems: "center",
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  rewardButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  unlockedText: {
+    color: "#FFD166",
+    marginBottom: 12,
+    fontSize: 12,
+  },
+  adInfo: {
+    marginTop: 22,
+    padding: 16,
+    backgroundColor: "#0D1322",
+    borderRadius: 14,
+  },
+  adInfoTitle: {
+    color: "#28A8FF",
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  adInfoText: {
+    color: "#A8B1C7",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  restoreButton: {
+    alignItems: "center",
+    padding: 16,
+    marginTop: 8,
+  },
+  restoreText: {
+    color: "#28A8FF",
+    fontWeight: "700",
+  },
+  footer: {
+    color: "#78839C",
+    textAlign: "center",
+    fontSize: 11,
+    lineHeight: 18,
+    marginTop: 10,
+  },
 });

@@ -1,4 +1,4 @@
-import LiveThemePreview from './LiveThemePreview';
+
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
@@ -17,13 +17,6 @@ type Props = {
 };
 
 export default function LiveThemePreview({
-  <LiveThemePreview
-  name={template.name}
-  background={template.background}
-  surface={template.surface}
-  accent={template.accent}
-  text={template.text}
-/>
   name,
   background,
   surface,
@@ -49,11 +42,13 @@ export default function LiveThemePreview({
         Animated.timing(glow, {
           toValue: 1,
           duration: 1700,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(glow, {
           toValue: 0,
           duration: 1700,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ]),
@@ -103,8 +98,15 @@ export default function LiveThemePreview({
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: background }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: background },
+      ]}
+      accessibilityLabel={`${name} animated theme preview`}
+    >
       <Animated.View
+        pointerEvents="none"
         style={[
           styles.orbit,
           {
@@ -125,6 +127,7 @@ export default function LiveThemePreview({
       </Animated.View>
 
       <Animated.View
+        pointerEvents="none"
         style={[
           styles.glow,
           {
@@ -136,11 +139,17 @@ export default function LiveThemePreview({
       />
 
       <View style={styles.content}>
-        <Text style={[styles.brand, { color: accent }]}>
+        <Text
+          style={[styles.brand, { color: accent }]}
+          numberOfLines={1}
+        >
           BRITUME • LIVE THEME
         </Text>
 
-        <Text style={[styles.title, { color: text }]}>
+        <Text
+          style={[styles.title, { color: text }]}
+          numberOfLines={2}
+        >
           {name}
         </Text>
 
@@ -151,16 +160,34 @@ export default function LiveThemePreview({
         <View
           style={[
             styles.sampleCard,
-            { backgroundColor: surface, borderColor: accent },
+            {
+              backgroundColor: surface,
+              borderColor: accent,
+            },
           ]}
         >
-          <View style={[styles.sampleIcon, { backgroundColor: accent }]} />
+          <View
+            style={[
+              styles.sampleIcon,
+              { backgroundColor: accent },
+            ]}
+          />
 
           <View style={styles.sampleCopy}>
-            <Text style={[styles.sampleTitle, { color: text }]}>
+            <Text
+              style={[styles.sampleTitle, { color: text }]}
+              numberOfLines={1}
+            >
               Your BRITUME
             </Text>
-            <Text style={[styles.sampleSubtitle, { color: text }]}>
+
+            <Text
+              style={[
+                styles.sampleSubtitle,
+                { color: text },
+              ]}
+              numberOfLines={1}
+            >
               Personalised for you
             </Text>
           </View>
@@ -168,7 +195,10 @@ export default function LiveThemePreview({
           <Animated.View
             style={[
               styles.liveIndicator,
-              { backgroundColor: accent, opacity: glowOpacity },
+              {
+                backgroundColor: accent,
+                opacity: glowOpacity,
+              },
             ]}
           />
         </View>

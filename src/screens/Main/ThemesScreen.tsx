@@ -25,13 +25,13 @@ import type {
   ThemePalette,
 } from '../../theme/AppThemeContext';
 import {
-  getAccountPreferences,
   getPremiumEntitlement,
   hasPremiumAccess,
   saveAccountPreferences,
   uploadThemeBackground,
   getThemeBackgroundUrl,
 } from '../../services/launchFeatureService';
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Themes'>;
 

@@ -223,8 +223,8 @@ src/
 
 1. Apply and verify the existing Supabase migrations in a non-production project,
    then smoke-test authentication, feeds, and RLS with separate accounts.
-2. Configure the real BRITUME icon and splash source assets; none are present
-   in this repository yet.
+2. Confirm the current BRITUME icon and splash artwork are the approved
+   release assets.
 3. Link the EAS project, set its build environment and Android signing, then
    build and test the internal APK on a device. Do not publish it to Google Play.
 4. Configure real Google Play products and trusted server-side purchase

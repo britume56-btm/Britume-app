@@ -13,9 +13,11 @@ TextInput,
 View,
 } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibraryLegacy from 'expo-media-library/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -51,6 +53,11 @@ const TABS: { key: Tab; label: string }[] = [
 { key: 'hidden', label: 'Hidden' },
 ];
 
+const VIDEO_STYLES = StyleSheet.create({
+videoBox: { width: '100%', height: 230, backgroundColor: '#080808' },
+video: { width: '100%', height: '100%' },
+});
+
 function getKind(mime?: string | null, name = ''): Kind {
 const type = (mime || '').toLowerCase();
 const ext = name.split('.').pop()?.toLowerCase() || '';
@@ -61,14 +68,14 @@ if (type.startsWith('audio/') || ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].inc
 return 'file';
 }
 
-function GalleryVideo({ uri, palette }: { uri: string; palette: any }) {
+function GalleryVideo({ uri }: { uri: string }) {
 const player = useVideoPlayer(uri, p => {
 p.loop = false;
 });
 
 return (
-<View style={styles.videoBox}>
-<VideoView player={player} style={styles.video} nativeControls contentFit="contain" />
+<View style={VIDEO_STYLES.videoBox}>
+<VideoView player={player} style={VIDEO_STYLES.video} nativeControls contentFit="contain" />
 </View>
 );
 }
@@ -175,44 +182,58 @@ setBusy(true);
 const loadDeviceMedia = useCallback(async () => {
 try {
 setBusy(true);
-const permission = await MediaLibrary.requestPermissionsAsync();
-
-  if (!permission.granted) {
-    Alert.alert(
-      'Permission needed',
-      'Allow BRITUME Gallery to access your selected device photos and videos.'
-    );
-    return;
-  }
-
-  const result = await MediaLibrary.getAssetsAsync({
-    first: 100,
-    mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
-    sortBy: [MediaLibrary.SortBy.creationTime],
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images', 'videos'],
+    allowsMultipleSelection: true,
+    quality: 1,
   });
 
-  const existing = new Set(items.map(item => item.id));
-  const deviceItems: GalleryItem[] = result.assets
-    .filter(asset => !existing.has(`device-${asset.id}`))
-    .map(asset => ({
-      id: `device-${asset.id}`,
-      uri: asset.uri,
-      name: asset.filename || 'Media',
-      kind: asset.mediaType === 'video' ? 'video' : 'photo',
+  if (result.canceled) return;
+
+  const directory = `${FileSystem.documentDirectory}britume-gallery/`;
+  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+
+  const existingIds = new Set(items.map(item => item.id));
+  const existingUris = new Set(items.map(item => item.uri));
+  const deviceItems: GalleryItem[] = [];
+
+  for (const [index, asset] of result.assets.entries()) {
+    const id = `device-${encodeURIComponent(asset.assetId ?? asset.uri)}`;
+    if (existingIds.has(id) || existingUris.has(asset.uri)) continue;
+
+const isVideo =
+  asset.type === 'video' ||
+  asset.type === 'pairedVideo' ||
+  asset.mimeType?.startsWith('video/') === true;
+    const name = asset.fileName ||
+      `device-${isVideo ? 'video' : 'photo'}-${index + 1}.${isVideo ? 'mp4' : 'jpg'}`;
+    const mimeType = asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
+    const safeName = name.replace(/[^\w.\- ]/g, '_');
+    const destination = `${directory}${id}-${safeName}`;
+
+    await FileSystem.copyAsync({ from: asset.uri, to: destination });
+
+    deviceItems.push({
+      id,
+      uri: destination,
+      name,
+      kind: getKind(mimeType, name),
       hidden: false,
-      album: 'Device media',
-      duration: asset.duration,
-    }));
+      album: selectedAlbum === 'All items' ? 'Device media' : selectedAlbum,
+      mimeType,
+      duration: asset.duration ?? undefined,
+    });
+  }
 
   await persistItems([...deviceItems, ...items]);
-  Alert.alert('BRITUME Gallery', `Found ${deviceItems.length} new device item(s).`);
+  Alert.alert('BRITUME Gallery', `${deviceItems.length} selected item(s) added.`);
 } catch (error) {
-  Alert.alert('Could not load media', error instanceof Error ? error.message : 'Please try again.');
+  Alert.alert('Could not import media', error instanceof Error ? error.message : 'Please try again.');
 } finally {
   setBusy(false);
 }
 
-}, [items, persistItems]);
+}, [items, persistItems, selectedAlbum]);
 
 const authenticate = useCallback(async () => {
 try {
@@ -340,7 +361,7 @@ return;
     return;
   }
 
-  await MediaLibrary.createAssetAsync(item.uri);
+  await MediaLibraryLegacy.createAssetAsync(item.uri);
   Alert.alert('Saved', 'A copy was saved to your phone media library. Your BRITUME item remains available.');
 } catch (error) {
   Alert.alert('Save failed', error instanceof Error ? error.message : 'Could not save this item.');
@@ -487,7 +508,7 @@ return (
 <SafeAreaView style={[styles.screen, { backgroundColor: palette.background }]}>
 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actionRow}>
 <Action label="＋ Import files" onPress={() => void importFiles()} palette={palette} />
-<Action label="▣ Scan device media" onPress={() => void loadDeviceMedia()} palette={palette} />
+<Action label="▣ Choose device media" onPress={() => void loadDeviceMedia()} palette={palette} />
 <Action label="＋ Album" onPress={() => {
 Alert.prompt?.('New album', 'Enter an album name', setAlbumName);
 }} palette={palette} />
@@ -566,7 +587,7 @@ Alert.prompt?.('New album', 'Enter an album name', setAlbumName);
       <Text style={{ fontSize: 40 }}>🗂️</Text>
       <Text style={[styles.emptyTitle, { color: palette.text }]}>Your Gallery starts here</Text>
       <Text style={[styles.emptyText, { color: palette.muted }]}>
-        Import photos, videos, music or documents, or scan your device media.
+        Import files or choose photos and videos from your device library.
       </Text>
     </View>
   ) : (
@@ -594,7 +615,7 @@ Alert.prompt?.('New album', 'Enter an album name', setAlbumName);
       {selected.kind === 'photo' ? (
         <Image source={{ uri: selected.uri }} resizeMode="contain" style={styles.preview} />
       ) : selected.kind === 'video' ? (
-        <GalleryVideo uri={selected.uri} palette={palette} />
+        <GalleryVideo uri={selected.uri} />
       ) : (
         <Text style={{ color: palette.muted, paddingVertical: 12 }}>
           {selected.kind === 'music' ? '🎵 Audio file selected' : '📄 Document selected'}
@@ -679,7 +700,5 @@ details: { position: 'absolute', left: 8, right: 8, bottom: 8, borderWidth: 1, b
 detailsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, gap: 10 },
 detailsTitle: { flex: 1, fontSize: 15, fontWeight: '800' },
 preview: { width: '100%', height: 230, backgroundColor: '#080808' },
-videoBox: { width: '100%', height: 230, backgroundColor: '#080808' },
-video: { width: '100%', height: '100%' },
 });
 }

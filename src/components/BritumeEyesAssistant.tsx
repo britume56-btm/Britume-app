@@ -144,7 +144,7 @@ export default function BritumeEyesAssistant() {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 999,
     elevation: 20,
     pointerEvents: 'box-none',

@@ -22,9 +22,9 @@ apply SQL to a live Supabase project, create store products, or publish an APK.
   eas build --profile internal --platform android
   ```
 
-- The repo has no approved launcher icon or splash image, so the Expo icon and
-  splash fields are intentionally not pointed at substitute artwork. Add the
-  supplied BRITUME source assets before calling the APK release-ready.
+- The BRITUME launcher icon and splash artwork are present in the repository.
+  The native splash screen is configured through the SDK-compatible
+  `expo-splash-screen` config plugin.
 - `app.json` contains the existing Expo project identifiers supplied by
   the owner. This source configuration does not confirm remote Expo access or
   Android signing readiness; verify both in EAS before a production build. No
@@ -107,5 +107,7 @@ Only these client-visible values are currently used:
 - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 Anything prefixed `EXPO_PUBLIC_` is included in the client bundle and is not a
-secret. Configure these per EAS environment for builds. Keep server-side keys
-such as `SUPABASE_SERVICE_ROLE_KEY` in Supabase Edge Function secrets only.
+secret. The app currently includes public-client fallback values in
+`lib/supabase.ts`; set these EAS variables explicitly to select the intended
+project for each build. Keep server-side keys such as
+`SUPABASE_SERVICE_ROLE_KEY` in Supabase Edge Function secrets only.

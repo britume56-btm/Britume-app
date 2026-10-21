@@ -6,11 +6,6 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./britume-app-icon.png",
-"splash": {
-  "image": "./britume-splash.png",
-  "resizeMode": "contain",
-  "backgroundColor": "#000000"
-},
     "scheme": "britume",
     "userInterfaceStyle": "dark",
     "plugins": [
@@ -28,7 +23,25 @@
           "microphonePermission": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./britume-splash.png",
+          "imageWidth": 360,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "BRITUME accesses media only when you choose it.",
+          "savePhotosPermission": "BRITUME saves media only when you ask.",
+          "granularPermissions": []
+        }
+      ]
     ],
     "android": {
       "package": "com.britume.app",

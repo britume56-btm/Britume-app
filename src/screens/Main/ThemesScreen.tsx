@@ -17,6 +17,13 @@ type Props = {
 };
 
 export default function LiveThemePreview({
+  <LiveThemePreview
+  name={template.name}
+  background={template.background}
+  surface={template.surface}
+  accent={template.accent}
+  text={template.text}
+/>
   name,
   background,
   surface,

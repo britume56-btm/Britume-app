@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -28,6 +30,20 @@ type SettingsNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+type Preferences = {
+  dataSaver: boolean;
+  autoplay: boolean;
+  wifiOnlyDownloads: boolean;
+};
+
+const PREFERENCES_KEY = 'britume-settings-preferences-v1';
+
+const DEFAULT_PREFERENCES: Preferences = {
+  dataSaver: false,
+  autoplay: true,
+  wifiOnlyDownloads: false,
+};
+
 const settingsSections = [
   {
     title: 'Account',
@@ -36,56 +52,48 @@ const settingsSections = [
   },
   {
     title: 'Security',
-    body: 'Set or change your app PIN and use device biometrics.',
+    body: 'Manage your app PIN and device biometrics.',
     route: 'Security',
   },
   {
     title: 'Change account password',
-    body: 'Re-enter your current password before setting a new one.',
+    body: 'Verify your current password before changing it.',
     action: 'change-password',
   },
   {
     title: 'Privacy & permissions',
-    body: 'Manage device permissions in system settings. BRITUME opens the system media picker so only items you choose are accessible.',
+    body: 'Open device settings to manage BRITUME permissions.',
     action: 'device-settings',
   },
   {
     title: 'Delete account',
-    body: 'Permanently delete your BRITUME account and associated profile data after password confirmation.',
+    body: 'Permanently delete your account after verification.',
     action: 'delete-account',
   },
   {
     title: 'Notifications',
-    body: 'Read notifications and manage in-app preferences.',
+    body: 'Manage your notification preferences.',
     route: 'Notifications',
   },
   {
     title: 'Appearance / Themes',
-    body: 'Choose an app theme or create a custom one.',
+    body: 'Choose your app theme and appearance.',
     route: 'Themes',
   },
   {
     title: 'Premium',
-    body: 'Check verified membership status, expiration, and billing setup.',
+    body: 'Check your membership information.',
     route: 'Premium',
   },
   {
     title: 'Gallery',
-    body: 'Choose on-device photos or videos and manage the current selection.',
+    body: 'Access selected photos and videos.',
     route: 'Gallery',
   },
   {
     title: 'Labs',
-    body: 'Enable or disable the account-synced Focus Mode and Compact Home experiments.',
+    body: 'Manage Focus Mode and Compact Home.',
     route: 'Labs',
-  },
-  {
-    title: 'Storage',
-    body: 'Review or clear on-device TV downloads.',
-  },
-  {
-    title: 'About BRITUME',
-    body: 'BRITUME community and content app.',
   },
 ] as const;
 
@@ -95,11 +103,19 @@ export default function SettingsScreen({
   navigation: SettingsNavigationProp;
 }) {
   const { palette } = useAppTheme();
+
+  const [preferences, setPreferences] =
+    useState<Preferences>(DEFAULT_PREFERENCES);
+  const [preferencesLoading, setPreferencesLoading] = useState(true);
+  const [preferencesError, setPreferencesError] = useState('');
+
   const [offlineCount, setOfflineCount] = useState(0);
   const [offlineBytes, setOfflineBytes] = useState(0);
   const [storageLoading, setStorageLoading] = useState(true);
   const [storageError, setStorageError] = useState('');
-  const [actionModal, setActionModal] = useState<'change-password' | 'delete-account' | null>(null);
+
+  const [actionModal, setActionModal] =
+    useState<'change-password' | 'delete-account' | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -107,12 +123,65 @@ export default function SettingsScreen({
   const [accountEmail, setAccountEmail] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
 
+  const loadPreferences = useCallback(async () => {
+    setPreferencesLoading(true);
+    setPreferencesError('');
+
+    try {
+      const saved = await AsyncStorage.getItem(PREFERENCES_KEY);
+
+      if (saved) {
+        const parsed: Partial<Preferences> = JSON.parse(saved);
+
+        setPreferences({
+          dataSaver:
+            typeof parsed.dataSaver === 'boolean'
+              ? parsed.dataSaver
+              : DEFAULT_PREFERENCES.dataSaver,
+          autoplay:
+            typeof parsed.autoplay === 'boolean'
+              ? parsed.autoplay
+              : DEFAULT_PREFERENCES.autoplay,
+          wifiOnlyDownloads:
+            typeof parsed.wifiOnlyDownloads === 'boolean'
+              ? parsed.wifiOnlyDownloads
+              : DEFAULT_PREFERENCES.wifiOnlyDownloads,
+        });
+      }
+    } catch {
+      setPreferencesError('Could not load saved preferences.');
+    } finally {
+      setPreferencesLoading(false);
+    }
+  }, []);
+
+  const updatePreference = async (
+    key: keyof Preferences,
+    value: boolean,
+  ) => {
+    const updated = { ...preferences, [key]: value };
+
+    setPreferences(updated);
+
+    try {
+      await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
+      setPreferencesError('');
+    } catch {
+      setPreferencesError(
+        'Could not save the setting. Please try again.',
+      );
+      setPreferences(preferences);
+      Alert.alert('Setting not saved', 'Please try changing it again.');
+    }
+  };
+
   const refreshOfflineStorage = useCallback(async () => {
     setStorageLoading(true);
     setStorageError('');
+
     try {
       const keys = (await AsyncStorage.getAllKeys()).filter((key) =>
-        key.startsWith(OFFLINE_VIDEO_KEY_PREFIX)
+        key.startsWith(OFFLINE_VIDEO_KEY_PREFIX),
       );
       const entries = await AsyncStorage.multiGet(keys);
       const staleKeys: string[] = [];
@@ -124,11 +193,14 @@ export default function SettingsScreen({
           staleKeys.push(key);
           continue;
         }
+
         const file = new File(uri);
+
         if (!file.exists) {
           staleKeys.push(key);
           continue;
         }
+
         count += 1;
         bytes += file.size ?? 0;
       }
@@ -136,10 +208,15 @@ export default function SettingsScreen({
       if (staleKeys.length) {
         await AsyncStorage.multiRemove(staleKeys);
       }
+
       setOfflineCount(count);
       setOfflineBytes(bytes);
-    } catch (cause) {
-      setStorageError(cause instanceof Error ? cause.message : 'Could not read offline storage.');
+    } catch (error) {
+      setStorageError(
+        error instanceof Error
+          ? error.message
+          : 'Could not read offline storage.',
+      );
     } finally {
       setStorageLoading(false);
     }
@@ -147,14 +224,15 @@ export default function SettingsScreen({
 
   useFocusEffect(
     useCallback(() => {
+      void loadPreferences();
       void refreshOfflineStorage();
-    }, [refreshOfflineStorage])
+    }, [loadPreferences, refreshOfflineStorage]),
   );
 
   function confirmClearOfflineVideos() {
     Alert.alert(
       'Remove offline videos?',
-      'Downloaded TV videos will be removed from this device. Online posts will stay available.',
+      'Downloaded TV videos will be removed from this device. Online posts will remain available.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -164,35 +242,33 @@ export default function SettingsScreen({
             void (async () => {
               try {
                 const keys = (await AsyncStorage.getAllKeys()).filter((key) =>
-                  key.startsWith(OFFLINE_VIDEO_KEY_PREFIX)
+                  key.startsWith(OFFLINE_VIDEO_KEY_PREFIX),
                 );
                 const entries = await AsyncStorage.multiGet(keys);
+
                 for (const [, uri] of entries) {
                   if (uri) {
                     const file = new File(uri);
-                    if (file.exists) {
-                      file.delete();
-                    }
+                    if (file.exists) file.delete();
                   }
                 }
+
                 await AsyncStorage.multiRemove(keys);
                 await refreshOfflineStorage();
-                Alert.alert('Downloads removed', 'Offline TV videos were cleared from this device.');
-              } catch (cause) {
-                Alert.alert(
-                  'Could not clear downloads',
-                  cause instanceof Error ? cause.message : 'Please try again.'
-                );
+                Alert.alert('Downloads removed', 'Offline videos were cleared.');
+              } catch {
+                Alert.alert('Could not clear downloads', 'Please try again.');
               }
             })();
           },
         },
-      ]
+      ],
     );
   }
 
   async function signOut() {
     const { error } = await supabase.auth.signOut();
+
     if (error) {
       Alert.alert('Sign out failed', error.message);
       return;
@@ -205,27 +281,39 @@ export default function SettingsScreen({
     try {
       await Linking.openSettings();
     } catch {
-      Alert.alert('Settings unavailable', 'Open your device settings to manage BRITUME permissions.');
+      Alert.alert(
+        'Settings unavailable',
+        'Open your device settings to manage BRITUME permissions.',
+      );
     }
   }
 
-  async function openSettingsActionModal(mode: 'change-password' | 'delete-account') {
+  async function openSettingsActionModal(
+    mode: 'change-password' | 'delete-account',
+  ) {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setConfirmationEmail('');
     setAccountEmail('');
+
     if (mode === 'delete-account') {
-      const { data } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getUser();
+
+      if (error) {
+        Alert.alert('Account unavailable', error.message);
+        return;
+      }
+
       setAccountEmail(data.user?.email ?? '');
     }
+
     setActionModal(mode);
   }
 
   function closeSettingsActionModal() {
-    if (actionBusy) {
-      return;
-    }
+    if (actionBusy) return;
+
     setActionModal(null);
     setCurrentPassword('');
     setNewPassword('');
@@ -239,42 +327,47 @@ export default function SettingsScreen({
       Alert.alert('Password too short', 'Use at least 8 characters.');
       return;
     }
+
     if (newPassword !== confirmPassword) {
-      Alert.alert('Passwords do not match', 'Enter the same new password twice.');
+      Alert.alert('Passwords do not match', 'Enter the same password twice.');
       return;
     }
 
     setActionBusy(true);
+
     try {
       const { data, error: userError } = await supabase.auth.getUser();
+
       if (userError || !data.user?.email) {
-        throw userError ?? new Error('Your account email could not be loaded. Sign in again.');
+        throw userError ?? new Error('Could not load your account email.');
       }
 
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: data.user.email,
-        password: currentPassword,
-      });
+      const { error: reauthError } =
+        await supabase.auth.signInWithPassword({
+          email: data.user.email,
+          password: currentPassword,
+        });
+
       if (reauthError) {
-        throw new Error('Current password is incorrect. Your password was not changed.');
+        throw new Error('Current password is incorrect.');
       }
 
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
-      if (updateError) {
-        throw updateError;
-      }
+
+      if (error) throw error;
 
       setActionModal(null);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('Password updated', 'Your BRITUME account password has been changed.');
-    } catch (cause) {
+
+      Alert.alert('Password updated', 'Your account password has changed.');
+    } catch (error) {
       Alert.alert(
         'Could not change password',
-        cause instanceof Error ? cause.message : 'Please try again.'
+        error instanceof Error ? error.message : 'Please try again.',
       );
     } finally {
       setActionBusy(false);
@@ -282,138 +375,304 @@ export default function SettingsScreen({
   }
 
   async function deleteAccount() {
-    if (!accountEmail || confirmationEmail.trim().toLowerCase() !== accountEmail.toLowerCase()) {
-      Alert.alert('Confirm your email', 'Enter the signed-in account email exactly to continue.');
+    if (
+      !accountEmail ||
+      confirmationEmail.trim().toLowerCase() !== accountEmail.toLowerCase()
+    ) {
+      Alert.alert(
+        'Confirm your email',
+        'Enter the signed-in account email to continue.',
+      );
       return;
     }
 
     setActionBusy(true);
+
     try {
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email: accountEmail,
-        password: currentPassword,
-      });
+      const { error: reauthError } =
+        await supabase.auth.signInWithPassword({
+          email: accountEmail,
+          password: currentPassword,
+        });
+
       if (reauthError) {
-        throw new Error('Current password is incorrect. Your account was not deleted.');
+        throw new Error('Current password is incorrect. Account not deleted.');
       }
 
-      const { error: deleteError } = await supabase.functions.invoke('delete-account');
-      if (deleteError) {
+      const { error } =
+        await supabase.functions.invoke('delete-account');
+
+      if (error) {
         throw new Error(
-          `Account deletion did not complete. Check that the secure delete-account function is deployed, then retry. ${deleteError.message}`
+          `Account deletion did not complete. Check that the secure delete-account function is deployed. ${error.message}`,
         );
       }
 
       setActionModal(null);
       await supabase.auth.signOut({ scope: 'local' });
+
       Alert.alert('Account deleted', 'Your BRITUME account has been deleted.');
-    } catch (cause) {
+    } catch (error) {
       Alert.alert(
         'Could not delete account',
-        cause instanceof Error ? cause.message : 'Your account was not deleted. Please try again.'
+        error instanceof Error ? error.message : 'Please try again.',
       );
     } finally {
       setActionBusy(false);
     }
   }
 
+  function navigateToSection(title: string) {
+    switch (title) {
+      case 'Account':
+        navigation.navigate('PROFILE');
+        break;
+      case 'Security':
+        navigation.navigate('Security');
+        break;
+      case 'Notifications':
+        navigation.navigate('Notifications');
+        break;
+      case 'Appearance / Themes':
+        navigation.navigate('Themes');
+        break;
+      case 'Premium':
+        navigation.navigate('Premium');
+        break;
+      case 'Gallery':
+        navigation.navigate('Gallery');
+        break;
+      case 'Labs':
+        navigation.navigate('Labs');
+        break;
+    }
+  }
+
+  function renderPreference(
+    title: string,
+    description: string,
+    key: keyof Preferences,
+  ) {
+    return (
+      <View
+        key={key}
+        style={[
+          styles.preferenceRow,
+          { borderColor: palette.border },
+        ]}
+      >
+        <View style={styles.preferenceText}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>
+            {title}
+          </Text>
+          <Text style={[styles.sectionBody, { color: palette.muted }]}>
+            {description}
+          </Text>
+        </View>
+
+        <Switch
+          accessibilityLabel={title}
+          value={preferences[key]}
+          onValueChange={(value) => void updatePreference(key, value)}
+          trackColor={{ false: '#465064', true: '#9a7a36' }}
+          thumbColor={preferences[key] ? '#f0d38b' : '#e4e7ec'}
+        />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: palette.background }]}>
-      <Text style={[styles.kicker, { color: palette.accent }]}>BRITUME • SETTINGS</Text>
-      <Text style={[styles.title, { color: palette.text }]}>Control center</Text>
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { backgroundColor: palette.background },
+      ]}
+    >
+      <Text style={[styles.kicker, { color: palette.accent }]}>
+        BRITUME • SETTINGS
+      </Text>
+
+      <Text style={[styles.title, { color: palette.text }]}>
+        Control center
+      </Text>
+
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>
+          Playback & data
+        </Text>
+
+        <Text style={[styles.sectionBody, { color: palette.muted }]}>
+          Control your preferred data and playback settings.
+        </Text>
+
+        {preferencesLoading ? (
+          <Text style={[styles.sectionBody, { color: palette.muted }]}>
+            Loading saved preferences…
+          </Text>
+        ) : (
+          <>
+            {renderPreference(
+              'Data Saver',
+              'Preference for reducing mobile data use. Video screens must apply this setting.',
+              'dataSaver',
+            )}
+
+            {renderPreference(
+              'Autoplay videos',
+              'Save your autoplay preference for supported video screens.',
+              'autoplay',
+            )}
+
+            {renderPreference(
+              'Wi-Fi-only downloads',
+              'Preference for downloads. Download screens must enforce this setting.',
+              'wifiOnlyDownloads',
+            )}
+          </>
+        )}
+
+        {preferencesError ? (
+          <Text style={styles.errorText}>{preferencesError}</Text>
+        ) : null}
+      </View>
+
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>
+          Privacy & safety
+        </Text>
+
+        <Text style={[styles.sectionBody, { color: palette.muted }]}>
+          Manage device permissions and account security. User blocking,
+          reporting, and moderation still need integration with the social
+          screens and secure backend.
+        </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void openDeviceSettings()}
+          style={styles.outlineButton}
+        >
+          <Text style={[styles.storageButtonText, { color: palette.accent }]}>
+            Open device permissions
+          </Text>
+        </Pressable>
+      </View>
 
       {settingsSections.map((section) => {
-        if (section.title === 'Storage') {
-          return (
-            <View key={section.title} style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: palette.text }]}>Storage</Text>
-              <Text style={[styles.sectionBody, { color: palette.muted }]}>
-                {storageLoading
-                  ? 'Checking offline videos…'
-                  : `${offlineCount} offline video${offlineCount === 1 ? '' : 's'} · ${formatStorageSize(offlineBytes)}`}
-              </Text>
-              {storageError ? <Text style={styles.errorText}>{storageError}</Text> : null}
-              <Pressable
-                accessibilityRole="button"
-                disabled={storageLoading || offlineCount === 0}
-                onPress={confirmClearOfflineVideos}
-                style={[
-                  styles.storageButton,
-                  (storageLoading || offlineCount === 0) && styles.storageButtonDisabled,
-                ]}
-              >
-                <Text style={styles.storageButtonText}>Clear offline videos</Text>
-              </Pressable>
-            </View>
-          );
-        }
-
-        if (section.title === 'About BRITUME') {
-          return (
-            <View key={section.title} style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: palette.text }]}>{section.title}</Text>
-              <Text style={[styles.sectionBody, { color: palette.muted }]}>{section.body}</Text>
-              <Text style={[styles.sectionBody, { color: palette.muted }]}>Version {appConfig.expo.version}</Text>
-            </View>
-          );
-        }
-
-        const implemented = 'route' in section || 'action' in section;
-        const onPress = () => {
-          if ('action' in section && section.action === 'device-settings') {
-            void openDeviceSettings();
-          } else if ('action' in section && section.action === 'change-password') {
-            void openSettingsActionModal('change-password');
-          } else if ('action' in section && section.action === 'delete-account') {
-            void openSettingsActionModal('delete-account');
-          } else if ('route' in section && section.route === 'PROFILE') {
-            navigation.navigate('PROFILE');
-          } else if ('route' in section && section.route === 'Security') {
-            navigation.navigate('Security');
-          } else if ('route' in section && section.route === 'Notifications') {
-            navigation.navigate('Notifications');
-          } else if ('route' in section && section.route === 'Themes') {
-            navigation.navigate('Themes');
-          } else if ('route' in section && section.route === 'Premium') {
-            navigation.navigate('Premium');
-          } else if ('route' in section && section.route === 'Gallery') {
-            navigation.navigate('Gallery');
-          } else if ('route' in section && section.route === 'Labs') {
-            navigation.navigate('Labs');
-          }
-        };
+        const isDelete = 'action' in section &&
+          section.action === 'delete-account';
 
         return (
           <Pressable
             key={section.title}
-            accessibilityRole={implemented ? 'button' : undefined}
-            accessibilityState={{ disabled: !implemented }}
-            disabled={!implemented}
-            onPress={onPress}
+            accessibilityRole="button"
+            onPress={() => {
+              if ('action' in section) {
+                if (section.action === 'device-settings') {
+                  void openDeviceSettings();
+                } else if (section.action === 'change-password') {
+                  void openSettingsActionModal('change-password');
+                } else if (section.action === 'delete-account') {
+                  void openSettingsActionModal('delete-account');
+                }
+              } else {
+                navigateToSection(section.title);
+              }
+            }}
             style={({ pressed }) => [
               styles.section,
               { backgroundColor: palette.surface, borderColor: palette.border },
-              pressed && implemented && styles.sectionPressed,
-              !implemented && styles.sectionDisabled,
+              pressed && styles.sectionPressed,
             ]}
           >
             <View style={styles.sectionHeading}>
-              <Text style={[styles.sectionTitle, { color: palette.text }]}>{section.title}</Text>
-              {section.title === 'Privacy & permissions' ? (
-                <Text style={[styles.comingSoon, { color: palette.accent }]}>DEVICE SETTINGS</Text>
-              ) : null}
-              {'action' in section && section.action === 'delete-account' ? (
+              <Text style={[styles.sectionTitle, { color: palette.text }]}>
+                {section.title}
+              </Text>
+
+              {isDelete ? (
                 <Text style={styles.dangerLabel}>IRREVERSIBLE</Text>
-              ) : null}
+              ) : (
+                <Text style={[styles.arrow, { color: palette.accent }]}>›</Text>
+              )}
             </View>
-            <Text style={[styles.sectionBody, { color: palette.muted }]}>{section.body}</Text>
+
+            <Text style={[styles.sectionBody, { color: palette.muted }]}>
+              {section.body}
+            </Text>
           </Pressable>
         );
       })}
 
-      <View style={styles.signOutWrap}>
-        <Button title="Sign out" onPress={signOut} />
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>
+          Storage
+        </Text>
+
+        <Text style={[styles.sectionBody, { color: palette.muted }]}>
+          {storageLoading
+            ? 'Checking offline videos…'
+            : `${offlineCount} offline video${offlineCount === 1 ? '' : 's'} · ${formatStorageSize(offlineBytes)}`}
+        </Text>
+
+        {storageError ? (
+          <Text style={styles.errorText}>{storageError}</Text>
+        ) : null}
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={storageLoading || offlineCount === 0}
+          onPress={confirmClearOfflineVideos}
+          style={[
+            styles.outlineButton,
+            (storageLoading || offlineCount === 0) &&
+              styles.storageButtonDisabled,
+          ]}
+        >
+          <Text style={[styles.storageButtonText, { color: palette.accent }]}>
+            Clear offline videos
+          </Text>
+        </Pressable>
       </View>
+
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>
+          About BRITUME
+        </Text>
+
+        <Text style={[styles.sectionBody, { color: palette.muted }]}>
+          BRITUME community and content app.
+        </Text>
+
+        <Text style={[styles.sectionBody, { color: palette.muted }]}>
+          Version {appConfig.expo.version}
+        </Text>
+      </View>
+
+      <View style={styles.signOutWrap}>
+        <Button title="Sign out" onPress={() => void signOut()} />
+      </View>
+
       <Modal
         animationType="fade"
         transparent
@@ -421,15 +680,24 @@ export default function SettingsScreen({
         onRequestClose={closeSettingsActionModal}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+            ]}
+          >
             <Text style={[styles.modalTitle, { color: palette.text }]}>
-              {actionModal === 'delete-account' ? 'Delete your account?' : 'Change account password'}
+              {actionModal === 'delete-account'
+                ? 'Delete your account?'
+                : 'Change account password'}
             </Text>
+
             <Text style={[styles.sectionBody, { color: palette.muted }]}>
               {actionModal === 'delete-account'
-                ? 'This permanently removes your account and profile data. Enter your current password and account email to confirm.'
+                ? 'Account deletion is permanent. Enter your current password and account email.'
                 : 'Confirm your current password, then choose a new one.'}
             </Text>
+
             <TextInput
               accessibilityLabel="Current account password"
               autoCapitalize="none"
@@ -440,6 +708,7 @@ export default function SettingsScreen({
               style={styles.modalInput}
               value={currentPassword}
             />
+
             {actionModal === 'change-password' ? (
               <>
                 <TextInput
@@ -452,6 +721,7 @@ export default function SettingsScreen({
                   style={styles.modalInput}
                   value={newPassword}
                 />
+
                 <TextInput
                   accessibilityLabel="Confirm new account password"
                   autoCapitalize="none"
@@ -466,8 +736,9 @@ export default function SettingsScreen({
             ) : (
               <>
                 <Text style={[styles.sectionBody, { color: palette.muted }]}>
-                  Type {accountEmail || 'the signed-in account email'} to confirm.
+                  Type {accountEmail || 'your signed-in account email'} to confirm.
                 </Text>
+
                 <TextInput
                   accessibilityLabel="Confirm account email for deletion"
                   autoCapitalize="none"
@@ -481,6 +752,7 @@ export default function SettingsScreen({
                 />
               </>
             )}
+
             <Pressable
               accessibilityRole="button"
               disabled={actionBusy}
@@ -503,13 +775,16 @@ export default function SettingsScreen({
                     : 'UPDATE PASSWORD'}
               </Text>
             </Pressable>
+
             <Pressable
               accessibilityRole="button"
               disabled={actionBusy}
               onPress={closeSettingsActionModal}
               style={styles.modalCancelButton}
             >
-              <Text style={[styles.storageButtonText, { color: palette.text }]}>Cancel</Text>
+              <Text style={[styles.storageButtonText, { color: palette.text }]}>
+                Cancel
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -521,35 +796,29 @@ export default function SettingsScreen({
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: '#070b12',
     gap: 12,
+    paddingBottom: 32,
   },
   kicker: {
-    color: '#d9b867',
     fontSize: 12,
     letterSpacing: 1.6,
     fontWeight: '800',
     marginBottom: 8,
   },
   title: {
-    color: '#f4f6fa',
     fontSize: 28,
     fontWeight: '800',
     marginBottom: 10,
   },
   section: {
-    backgroundColor: '#101722',
     borderWidth: 1,
-    borderColor: '#263247',
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 15,
+    overflow: 'hidden',
   },
   sectionPressed: {
     borderColor: '#d9b867',
     opacity: 0.8,
-  },
-  sectionDisabled: {
-    opacity: 0.72,
   },
   sectionHeading: {
     flexDirection: 'row',
@@ -558,48 +827,52 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: '#f4f6fa',
     fontSize: 16,
     fontWeight: '700',
-  },
-  comingSoon: {
-    color: '#8f9aab',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    flexShrink: 1,
   },
   sectionBody: {
-    color: '#c5ccd7',
     fontSize: 13,
     lineHeight: 20,
     marginTop: 6,
   },
-  signOutWrap: {
-    marginTop: 12,
+  arrow: {
+    fontSize: 24,
+    fontWeight: '700',
   },
-  storageButton: {
+  preferenceRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 12,
+    paddingTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  preferenceText: {
+    flex: 1,
+  },
+  outlineButton: {
     alignSelf: 'flex-start',
     borderColor: '#384b61',
-    borderRadius: 9,
+    borderRadius: 10,
     borderWidth: 1,
     marginTop: 12,
-    minHeight: 38,
+    minHeight: 40,
     justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  storageButtonDisabled: {
-    opacity: 0.5,
+    paddingHorizontal: 13,
   },
   storageButtonText: {
-    color: '#d9b867',
     fontSize: 12,
     fontWeight: '800',
+  },
+  storageButtonDisabled: {
+    opacity: 0.45,
   },
   errorText: {
     color: '#f18e8e',
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 7,
+    marginTop: 8,
   },
   dangerLabel: {
     color: '#f18e8e',
@@ -607,9 +880,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.8,
   },
+  signOutWrap: {
+    marginTop: 12,
+  },
   modalBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.76)',
     flex: 1,
     justifyContent: 'center',
     padding: 20,
@@ -621,7 +897,11 @@ const styles = StyleSheet.create({
     padding: 18,
     width: '100%',
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 7 },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 7,
+  },
   modalInput: {
     backgroundColor: '#090d15',
     borderColor: '#2c3a4d',
@@ -635,15 +915,22 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButton: {
     alignItems: 'center',
-    backgroundColor: '#d9b867',
+    backgroundColor: '#b9974e',
     borderRadius: 10,
     marginTop: 14,
-    minHeight: 42,
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
-  modalDangerButton: { backgroundColor: '#a93d49' },
-  modalPrimaryText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 0.7 },
+  modalDangerButton: {
+    backgroundColor: '#a93d49',
+  },
+  modalPrimaryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
   modalCancelButton: {
     alignItems: 'center',
     borderColor: '#384b61',

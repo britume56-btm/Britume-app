@@ -1,4 +1,4 @@
-
+import LiveThemePreview from './LiveThemePreview';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,

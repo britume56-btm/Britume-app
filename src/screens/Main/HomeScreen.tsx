@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme } from '../../theme/AppThemeContext';
 import {
@@ -26,39 +28,88 @@ import { supabase } from '../../../lib/supabase';
 const BLUE = '#5598F5';
 const PALE_BLUE = '#EAF3FF';
 const WHITE = '#FFFFFF';
+const CATEGORY_KEY = 'britume-living-categories-v1';
 
-const SHORTCUTS = [
-  { label: 'Social', icon: '👥', route: 'Social' },
-  { label: 'Chat', icon: '💬', route: 'Chat' },
-  { label: 'Technology', icon: '⚡', route: 'TECHNOLOGIES' },
-  { label: 'TV', icon: '▶️', route: 'TV' },
-  { label: 'Studios', icon: '🎬', route: 'STUDIOS' },
-  { label: 'Wear', icon: '👕', route: 'WEAR' },
+const DEFAULT_CATEGORIES = [
+  'SOCIAL',
+  'CHAT',
+  'TECHNOLOGIES',
+  'TV',
+  'STUDIOS',
+  'WEAR',
 ];
 
+const CATEGORIES = [
+  { id: 'SOCIAL', label: 'Social', icon: '👥' },
+  { id: 'CHAT', label: 'Chat', icon: '💬' },
+  { id: 'TECHNOLOGIES', label: 'Technology', icon: '⚡' },
+  { id: 'TV', label: 'TV', icon: '▶️' },
+  { id: 'STUDIOS', label: 'Studios', icon: '🎬' },
+  { id: 'WEAR', label: 'Wear', icon: '👕' },
+  { id: 'FOUNDATION', label: 'Foundation', icon: '◇' },
+  { id: 'GAMES', label: 'Games', icon: '🎮' },
+  { id: 'LABS', label: 'Labs', icon: '🧪' },
+  { id: 'THEMES', label: 'Themes', icon: '🎨' },
+  { id: 'GALLERY', label: 'Gallery', icon: '🖼️' },
+  { id: 'NOTIFICATIONS', label: 'Notifications', icon: '🔔' },
+  { id: 'PREMIUM', label: 'Premium', icon: '✦' },
+  { id: 'SECURITY', label: 'Security', icon: '🔒' },
+] as const;
+
 export default function HomeScreen({ navigation }: any) {
-  const { palette } = useAppTheme();
+  useAppTheme();
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [draft, setDraft] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [categories, setCategories] =
+    useState<string[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [feedMessage, setFeedMessage] = useState('');
+
+  const loadCategories = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(CATEGORY_KEY);
+
+      if (!saved) {
+        setCategories(DEFAULT_CATEGORIES);
+        return;
+      }
+
+      const parsed: unknown = JSON.parse(saved);
+
+      if (!Array.isArray(parsed)) {
+        setCategories(DEFAULT_CATEGORIES);
+        return;
+      }
+
+      const valid = parsed.filter(
+        (id): id is string =>
+          typeof id === 'string' &&
+          CATEGORIES.some((category) => category.id === id),
+      );
+
+      setCategories(valid.slice(0, 6));
+    } catch {
+      setCategories(DEFAULT_CATEGORIES);
+    }
+  }, []);
 
   const loadFeed = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.getUser();
-
       if (error) throw error;
 
       const user = data.user;
 
       if (!user) {
         setUserId(null);
+        setAvatarUrl(null);
         setPosts([]);
         setFeedMessage('Sign in to see your BRITUME feed.');
         return;
@@ -66,18 +117,27 @@ export default function HomeScreen({ navigation }: any) {
 
       setUserId(user.id);
 
+      const metadata = user.user_metadata ?? {};
+      const photo =
+        metadata.avatar_url ??
+        metadata.picture ??
+        metadata.photo_url ??
+        null;
+
+      setAvatarUrl(typeof photo === 'string' ? photo : null);
+
       const result = await listFeed(user.id);
       setPosts(result);
       setFeedMessage(
         result.length === 0
           ? 'Your feed is ready. Share the first post!'
-          : ''
+          : '',
       );
     } catch (error) {
       setFeedMessage(
         error instanceof Error
           ? error.message
-          : 'Could not load your feed. Check your connection.'
+          : 'Could not load your feed. Check your connection.',
       );
     } finally {
       setLoading(false);
@@ -92,15 +152,14 @@ export default function HomeScreen({ navigation }: any) {
       void loadFeed(false);
     });
 
-    return () => {
-      data.subscription.unsubscribe();
-    };
+    return () => data.subscription.unsubscribe();
   }, [loadFeed]);
 
   useFocusEffect(
     useCallback(() => {
       void loadFeed(false);
-    }, [loadFeed])
+      void loadCategories();
+    }, [loadFeed, loadCategories]),
   );
 
   const publishPost = async () => {
@@ -112,7 +171,7 @@ export default function HomeScreen({ navigation }: any) {
     }
 
     if (!content) {
-      Alert.alert('Write something', 'Enter some text before publishing.');
+      Alert.alert('Write something', 'Enter text before publishing.');
       return;
     }
 
@@ -131,9 +190,7 @@ export default function HomeScreen({ navigation }: any) {
     } catch (error) {
       Alert.alert(
         'Could not publish',
-        error instanceof Error
-          ? error.message
-          : 'Please try again.'
+        error instanceof Error ? error.message : 'Please try again.',
       );
     } finally {
       setPublishing(false);
@@ -141,36 +198,138 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const openShortcut = (route: string) => {
-    if (route === 'Social' || route === 'Chat') {
-      navigation.navigate(route);
+    if (route === 'SOCIAL') {
+      navigation.navigate('Social');
       return;
     }
 
-    if (route === 'TECHNOLOGIES' || route === 'TV' ||
-        route === 'STUDIOS' || route === 'WEAR') {
-      navigation.navigate('Module', { section: route });
+    if (route === 'CHAT') {
+      navigation.navigate('Chat');
       return;
+    }
+
+    if (route === 'GAMES') {
+      navigation.navigate('Games');
+      return;
+    }
+
+    if (route === 'THEMES') {
+      navigation.navigate('Themes');
+      return;
+    }
+
+    if (route === 'GALLERY') {
+      navigation.navigate('Gallery');
+      return;
+    }
+
+    if (route === 'NOTIFICATIONS') {
+      navigation.navigate('Notifications');
+      return;
+    }
+
+    if (route === 'PREMIUM') {
+      navigation.navigate('Premium');
+      return;
+    }
+
+    if (route === 'SECURITY') {
+      navigation.navigate('Security');
+      return;
+    }
+
+    if (route === 'LABS') {
+      navigation.navigate('Labs');
+      return;
+    }
+
+    if (
+      route === 'TECHNOLOGIES' ||
+      route === 'TV' ||
+      route === 'STUDIOS' ||
+      route === 'WEAR' ||
+      route === 'FOUNDATION'
+    ) {
+      navigation.navigate('Module', { section: route });
     }
   };
 
+  const openCreateMenu = () => {
+    Alert.alert('Create on BRITUME', 'Choose what you want to create.', [
+      {
+        text: 'Text post',
+        onPress: () => {
+          if (!userId) {
+            Alert.alert('Sign in required', 'Sign in to publish a post.');
+            return;
+          }
+          Alert.alert('Create a post', 'Write your post in the Share something box.');
+        },
+      },
+      {
+        text: 'Photo or video',
+        onPress: () =>
+          Alert.alert(
+            'Media posts',
+            'Photo and video publishing need to be connected before they can be used here.',
+          ),
+      },
+      {
+        text: 'Advertisement',
+        onPress: () =>
+          Alert.alert(
+            'Create an advertisement',
+            'The advertisement creation and review flow has not been connected yet.',
+          ),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const openPublicGroups = () => {
+    // The current navigator has a Social screen, but no separate
+    // Public Groups route has been confirmed.
+    navigation.navigate('Social');
+  };
+
   const openAuthor = (post: FeedPost) => {
-    navigation.navigate('PublicProfile', {
-      userId: post.author_id,
-    });
+    navigation.navigate('PublicProfile', { userId: post.author_id });
   };
 
   const formatDate = (date: string) => {
     const value = new Date(date);
     if (Number.isNaN(value.getTime())) return '';
+
     return value.toLocaleDateString(undefined, {
       day: 'numeric',
       month: 'short',
     });
   };
 
+  const renderAvatar = (size: number) => (
+    <View
+      style={[
+        styles.avatar,
+        { width: size, height: size, borderRadius: size * 0.34 },
+      ]}
+    >
+      {avatarUrl ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          style={styles.avatarImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <Text style={[styles.avatarLetter, { fontSize: size * 0.48 }]}>
+          B
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: PALE_BLUE }]}
+      style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="dark-content" backgroundColor={PALE_BLUE} />
@@ -190,19 +349,48 @@ export default function HomeScreen({ navigation }: any) {
           />
         }
       >
-        {/* BRITUME identity */}
         <View style={styles.header}>
-          <View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            onPress={() => navigation.navigate('PROFILE')}
+          >
+            {renderAvatar(48)}
+          </Pressable>
+
+          <View style={styles.brandArea}>
             <Text style={styles.brand}>BRITUME</Text>
             <Text style={styles.tagline}>See Beyond. Move Forward.</Text>
           </View>
 
-          <View style={styles.brandMark}>
-            <Text style={styles.brandMarkText}>B</Text>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Create"
+            onPress={openCreateMenu}
+            style={styles.headerButton}
+          >
+            <Text style={styles.plusText}>+</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => navigation.navigate('Notifications')}
+            style={styles.headerButton}
+          >
+            <Text style={styles.headerIcon}>♧</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={() => navigation.navigate('SETTINGS')}
+            style={styles.headerButton}
+          >
+            <Text style={styles.headerIcon}>⚙</Text>
+          </Pressable>
         </View>
 
-        {/* Welcome card */}
         <View style={styles.welcomeCard}>
           <View style={styles.welcomeCopy}>
             <Text style={styles.eyebrow}>YOUR WORLD, CONNECTED</Text>
@@ -216,33 +404,67 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.cloudIcon}>☁️</Text>
         </View>
 
-        {/* Six compact category shortcuts */}
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Explore BRITUME</Text>
-          <Text style={styles.sectionHint}>Your spaces</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('ManageCategories')}
+          >
+            <Text style={styles.manageLink}>Manage</Text>
+          </Pressable>
         </View>
 
-        <View style={styles.shortcutGrid}>
-          {SHORTCUTS.map((item) => (
-            <Pressable
-              key={item.label}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${item.label}`}
-              onPress={() => openShortcut(item.route)}
-              style={({ pressed }) => [
-                styles.shortcut,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.shortcutIcon}>
-                <Text style={styles.shortcutEmoji}>{item.icon}</Text>
-              </View>
-              <Text style={styles.shortcutLabel}>{item.label}</Text>
-            </Pressable>
-          ))}
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.shortcutRow}
+        >
+          {categories.map((id) => {
+            const item = CATEGORIES.find((category) => category.id === id);
+            if (!item) return null;
 
-        {/* Create post */}
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${item.label}`}
+                onPress={() => openShortcut(item.id)}
+                style={({ pressed }) => [
+                  styles.shortcut,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={styles.shortcutIcon}>
+                  <Text style={styles.shortcutEmoji}>{item.icon}</Text>
+                </View>
+                <Text numberOfLines={1} style={styles.shortcutLabel}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={openPublicGroups}
+          style={({ pressed }) => [
+            styles.groupsButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={styles.groupsIcon}>
+            <Text style={styles.groupsEmoji}>🌐</Text>
+          </View>
+          <View style={styles.groupsCopy}>
+            <Text style={styles.groupsTitle}>Public Groups</Text>
+            <Text style={styles.groupsSubtitle}>
+              Find people and communities
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+
         <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Share something</Text>
           <Text style={styles.sectionHint}>Your voice matters</Text>
@@ -250,9 +472,7 @@ export default function HomeScreen({ navigation }: any) {
 
         <View style={styles.composerCard}>
           <View style={styles.composerHeader}>
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarLetter}>B</Text>
-            </View>
+            {renderAvatar(42)}
             <View style={styles.composerIdentity}>
               <Text style={styles.composerTitle}>Create a post</Text>
               <Text style={styles.composerSubtitle}>
@@ -275,10 +495,7 @@ export default function HomeScreen({ navigation }: any) {
           />
 
           <View style={styles.composerFooter}>
-            <Text style={styles.characterCount}>
-              {draft.length}/2000
-            </Text>
-
+            <Text style={styles.characterCount}>{draft.length}/2000</Text>
             <Pressable
               accessibilityRole="button"
               disabled={!userId || !draft.trim() || publishing}
@@ -299,7 +516,6 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Living feed */}
         <View style={styles.feedHeading}>
           <View>
             <Text style={styles.sectionTitle}>Living Feed</Text>
@@ -307,9 +523,9 @@ export default function HomeScreen({ navigation }: any) {
               Posts from you and people you follow
             </Text>
           </View>
-
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Refresh feed"
             onPress={() => void loadFeed()}
             style={styles.refreshButton}
           >
@@ -349,25 +565,19 @@ export default function HomeScreen({ navigation }: any) {
                       {author.charAt(0).toUpperCase()}
                     </Text>
                   </View>
-
                   <View style={styles.authorDetails}>
                     <Text style={styles.authorName}>{author}</Text>
                     <Text style={styles.postDate}>
                       {formatDate(post.created_at)}
                     </Text>
                   </View>
-
                   <Text style={styles.postMenu}>•••</Text>
                 </Pressable>
 
                 <Text style={styles.postBody}>{post.body}</Text>
-
                 <View style={styles.postDivider} />
-
                 <View style={styles.postMetrics}>
-                  <Text style={styles.metric}>
-                    ♡ {post.like_count} likes
-                  </Text>
+                  <Text style={styles.metric}>♡ {post.like_count} likes</Text>
                   <Text style={styles.metric}>
                     ◯ {post.comment_count} comments
                   </Text>
@@ -390,74 +600,69 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 17,
-    paddingTop: 16,
-    paddingBottom: 35,
-  },
+  screen: { flex: 1, backgroundColor: PALE_BLUE },
+  content: { paddingHorizontal: 15, paddingTop: 14, paddingBottom: 35 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 7,
     marginBottom: 20,
   },
-  brand: {
-    color: '#183D70',
-    fontSize: 27,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  tagline: {
-    color: '#607A9B',
-    fontSize: 12,
-    marginTop: 3,
-  },
-  brandMark: {
-    width: 48,
-    height: 48,
-    borderRadius: 17,
-    backgroundColor: WHITE,
+  avatar: {
+    backgroundColor: '#DCEBFF',
     borderWidth: 1,
-    borderColor: '#D6E7FF',
+    borderColor: '#C9DFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    overflow: 'hidden',
   },
-  brandMarkText: {
-    color: BLUE,
-    fontSize: 28,
+  avatarImage: { width: '100%', height: '100%' },
+  avatarLetter: { color: '#2F6BB4', fontWeight: '900' },
+  brandArea: { flex: 1, marginLeft: 2 },
+  brand: {
+    color: '#183D70',
+    fontSize: 19,
     fontWeight: '900',
+    letterSpacing: 1,
   },
+  tagline: { color: '#607A9B', fontSize: 9, marginTop: 3 },
+  headerButton: {
+    width: 32,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: WHITE,
+    borderColor: '#D6E7FF',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusText: { color: BLUE, fontSize: 25, fontWeight: '700', lineHeight: 28 },
+  headerIcon: { color: '#42658F', fontSize: 18 },
   welcomeCard: {
-    minHeight: 165,
+    minHeight: 155,
     borderRadius: 27,
     backgroundColor: '#DCEBFF',
     borderColor: '#C8DFFF',
     borderWidth: 1,
-    padding: 20,
+    padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 25,
+    marginBottom: 23,
     overflow: 'hidden',
   },
-  welcomeCopy: {
-    flex: 1,
-  },
+  welcomeCopy: { flex: 1 },
   eyebrow: {
     color: '#477CC0',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     marginBottom: 9,
   },
   welcomeTitle: {
     color: '#183D70',
-    fontSize: 25,
-    lineHeight: 30,
+    fontSize: 24,
+    lineHeight: 29,
     fontWeight: '900',
   },
   welcomeSubtitle: {
@@ -467,67 +672,72 @@ const styles = StyleSheet.create({
     maxWidth: 225,
     lineHeight: 18,
   },
-  cloudIcon: {
-    fontSize: 47,
-    marginLeft: 5,
-  },
+  cloudIcon: { fontSize: 42, marginLeft: 4 },
   sectionHeading: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 13,
+    marginBottom: 12,
     marginTop: 2,
   },
-  sectionTitle: {
-    color: '#1D3B61',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  sectionHint: {
-    color: '#7186A2',
-    fontSize: 11,
-    marginTop: 4,
-  },
-  shortcutGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
+  sectionTitle: { color: '#1D3B61', fontSize: 17, fontWeight: '800' },
+  sectionHint: { color: '#7186A2', fontSize: 11, marginTop: 4 },
+  manageLink: { color: '#367CCF', fontSize: 12, fontWeight: '800' },
+  shortcutRow: { gap: 9, paddingBottom: 4 },
   shortcut: {
-    width: '31.5%',
-    minHeight: 100,
+    width: 76,
+    minHeight: 86,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 19,
     borderWidth: 1,
     borderColor: '#D8E8FB',
-    marginBottom: 9,
-    paddingVertical: 12,
+    paddingHorizontal: 4,
+    paddingVertical: 9,
     elevation: 2,
   },
   shortcutIcon: {
-    width: 47,
-    height: 47,
-    borderRadius: 17,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     backgroundColor: '#EDF5FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 7,
   },
-  shortcutEmoji: {
-    fontSize: 23,
-  },
+  shortcutEmoji: { fontSize: 21 },
   shortcutLabel: {
     color: '#355477',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
+    textAlign: 'center',
   },
-  pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.98 }],
+  pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
+  groupsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 19,
+    borderColor: '#D8E8FB',
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 16,
+    marginBottom: 24,
   },
+  groupsIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 15,
+    backgroundColor: '#EDF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupsEmoji: { fontSize: 22 },
+  groupsCopy: { flex: 1, marginLeft: 11 },
+  groupsTitle: { color: '#29466A', fontSize: 13, fontWeight: '800' },
+  groupsSubtitle: { color: '#8495AB', fontSize: 11, marginTop: 4 },
+  chevron: { color: BLUE, fontSize: 26, paddingHorizontal: 5 },
   composerCard: {
     backgroundColor: 'rgba(255,255,255,0.94)',
     borderColor: '#D7E6F8',
@@ -542,32 +752,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  avatarPlaceholder: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: '#DCEBFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLetter: {
-    color: '#2F6BB4',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  composerIdentity: {
-    marginLeft: 11,
-  },
-  composerTitle: {
-    color: '#25466F',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  composerSubtitle: {
-    color: '#8495AB',
-    fontSize: 11,
-    marginTop: 3,
-  },
+  composerIdentity: { marginLeft: 11 },
+  composerTitle: { color: '#25466F', fontWeight: '800', fontSize: 14 },
+  composerSubtitle: { color: '#8495AB', fontSize: 11, marginTop: 3 },
   postInput: {
     minHeight: 100,
     maxHeight: 180,
@@ -586,10 +773,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 12,
   },
-  characterCount: {
-    color: '#8B9BB0',
-    fontSize: 11,
-  },
+  characterCount: { color: '#8B9BB0', fontSize: 11 },
   publishButton: {
     minWidth: 105,
     minHeight: 40,
@@ -599,14 +783,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 17,
   },
-  publishText: {
-    color: WHITE,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
+  publishText: { color: WHITE, fontWeight: '800', fontSize: 13 },
+  disabledButton: { opacity: 0.45 },
   feedHeading: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -623,10 +801,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  refreshText: {
-    color: BLUE,
-    fontSize: 25,
-  },
+  refreshText: { color: BLUE, fontSize: 25 },
   statusCard: {
     minHeight: 110,
     borderRadius: 21,
@@ -636,10 +811,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 10,
   },
-  statusText: {
-    color: '#7186A2',
-    fontSize: 12,
-  },
+  statusText: { color: '#7186A2', fontSize: 12 },
   emptyCard: {
     backgroundColor: WHITE,
     borderColor: '#D8E8FB',
@@ -649,10 +821,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
-  emptyEmoji: {
-    fontSize: 33,
-    marginBottom: 10,
-  },
+  emptyEmoji: { fontSize: 33, marginBottom: 10 },
   emptyTitle: {
     color: '#294D78',
     fontSize: 17,
@@ -687,55 +856,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  postAvatarLetter: {
-    color: '#3674BF',
-    fontWeight: '900',
-    fontSize: 18,
-  },
-  authorDetails: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  authorName: {
-    color: '#29466A',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  postDate: {
-    color: '#8B9BB0',
-    fontSize: 10,
-    marginTop: 3,
-  },
-  postMenu: {
-    color: '#8195AE',
-    fontSize: 17,
-    letterSpacing: 2,
-  },
-  postBody: {
-    color: '#334A65',
-    fontSize: 14,
-    lineHeight: 22,
-  },
+  postAvatarLetter: { color: '#3674BF', fontWeight: '900', fontSize: 18 },
+  authorDetails: { flex: 1, marginLeft: 10 },
+  authorName: { color: '#29466A', fontSize: 13, fontWeight: '800' },
+  postDate: { color: '#8B9BB0', fontSize: 10, marginTop: 3 },
+  postMenu: { color: '#8195AE', fontSize: 17, letterSpacing: 2 },
+  postBody: { color: '#334A65', fontSize: 14, lineHeight: 22 },
   postDivider: {
     height: 1,
     backgroundColor: '#E8F0FA',
     marginTop: 15,
     marginBottom: 11,
   },
-  postMetrics: {
-    flexDirection: 'row',
-    gap: 19,
-  },
-  metric: {
-    color: '#7186A2',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  inlineMessage: {
-    color: '#7B8DA5',
-    fontSize: 12,
-    marginVertical: 8,
-  },
+  postMetrics: { flexDirection: 'row', gap: 19 },
+  metric: { color: '#7186A2', fontSize: 11, fontWeight: '600' },
+  inlineMessage: { color: '#7B8DA5', fontSize: 12, marginVertical: 8 },
   footerText: {
     color: '#8B9BB0',
     textAlign: 'center',

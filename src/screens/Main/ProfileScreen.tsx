@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
@@ -19,25 +23,65 @@ import {
   getAvatarSignedUrl,
   getLegacyAvatarObjectPath,
 } from '../../services/avatarService';
-import {
-  saveProfile,
-  fetchProfile,
-} from '../../services/profileService';
+import { fetchProfile, saveProfile } from '../../services/profileService';
 import { uploadAvatar } from '../../services/storageService';
 import type { ProfileRecord } from '../../types/profile';
 
-const COLORS = {
-  background: '#070B18',
-  surface: '#11182A',
-  glass: 'rgba(28, 40, 68, 0.68)',
-  border: 'rgba(151, 174, 255, 0.24)',
-  blue: '#65D9FF',
-  purple: '#A58BFF',
-  gold: '#E7C879',
-  white: '#F5F7FF',
-  muted: '#A6B2D0',
-  green: '#69E6B5',
+const C = {
+  background: '#F2F7FF',
+  surface: '#FFFFFF',
+  glass: 'rgba(255,255,255,0.82)',
+  blue: '#5598F5',
+  blueDark: '#2869C7',
+  paleBlue: '#EAF3FF',
+  border: '#D7E7FC',
+  text: '#203450',
+  muted: '#71839D',
+  green: '#299D79',
+  purple: '#8A75E8',
 };
+
+type CardProps = {
+  children: React.ReactNode;
+  style?: object;
+};
+
+const GlassCard = memo(function GlassCard({ children, style }: CardProps) {
+  return <View style={[styles.card, style]}>{children}</View>;
+});
+
+type ToolCardProps = {
+  symbol: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+};
+
+const ToolCard = memo(function ToolCard({
+  symbol,
+  title,
+  subtitle,
+  onPress,
+}: ToolCardProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${subtitle}`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.toolCard,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.toolIcon}>
+        <Text style={styles.toolSymbol}>{symbol}</Text>
+      </View>
+      <Text style={styles.toolTitle}>{title}</Text>
+      <Text style={styles.toolSubtitle}>{subtitle}</Text>
+      <Text style={styles.toolAction}>Explore →</Text>
+    </Pressable>
+  );
+});
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
@@ -49,13 +93,11 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Load the signed-in user's profile and recover a missing profile row.
   const loadProfile = useCallback(async () => {
     setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.getUser();
-
       if (error) throw error;
 
       const user = data.user;
@@ -69,21 +111,17 @@ export default function ProfileScreen() {
         return;
       }
 
-      let profileData = await fetchProfile(user.id);
+      let record = await fetchProfile(user.id);
 
-      if (!profileData) {
+      if (!record) {
         const emailName = user.email?.split('@')[0] || 'BRITUME User';
-
-        const safeBase =
+        const base =
           emailName.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20) ||
           'britumeuser';
 
-        const generatedUsername =
-          `${safeBase}_${user.id.replace(/-/g, '').slice(-6)}`;
-
-        profileData = await saveProfile({
+        record = await saveProfile({
           id: user.id,
-          username: generatedUsername,
+          username: `${base}_${user.id.replace(/-/g, '').slice(-6)}`,
           display_name:
             user.user_metadata?.display_name ||
             user.user_metadata?.full_name ||
@@ -91,29 +129,28 @@ export default function ProfileScreen() {
           avatar_path: null,
           phone: user.phone ?? null,
         });
-
-        if (!profileData) {
-          throw new Error(
-            'Could not load or create your profile. Check your Supabase profiles table, permissions, and username constraints.'
-          );
-        }
       }
 
-      setProfile(profileData);
-      setUsername(profileData.username ?? '');
-      setDisplayName(profileData.display_name ?? '');
+      if (!record) {
+        throw new Error(
+          'Your profile could not be loaded or created. Check your Supabase profiles table and permissions.'
+        );
+      }
 
-      const path =
-        profileData.avatar_path ??
-        getLegacyAvatarObjectPath(profileData.avatar_url, user.id);
+      setProfile(record);
+      setUsername(record.username ?? '');
+      setDisplayName(record.display_name ?? '');
 
-      setAvatarPath(path);
+      setAvatarPath(
+        record.avatar_path ??
+          getLegacyAvatarObjectPath(record.avatar_url, user.id)
+      );
     } catch (error) {
       Alert.alert(
         'Profile unavailable',
         error instanceof Error
           ? error.message
-          : 'Please check your connection and try again.'
+          : 'Check your connection and try again.'
       );
     } finally {
       setLoading(false);
@@ -128,7 +165,7 @@ export default function ProfileScreen() {
     useCallback(() => {
       let active = true;
 
-      const refreshAvatar = async () => {
+      async function refreshAvatar() {
         if (!avatarPath) {
           setAvatarUrl(null);
           return;
@@ -136,14 +173,12 @@ export default function ProfileScreen() {
 
         try {
           const url = await getAvatarSignedUrl(avatarPath);
-
           if (active) setAvatarUrl(url);
         } catch (error) {
           console.error('Avatar refresh failed:', error);
-
           if (active) setAvatarUrl(null);
         }
-      };
+      }
 
       void refreshAvatar();
 
@@ -153,7 +188,7 @@ export default function ProfileScreen() {
     }, [avatarPath])
   );
 
-  const pickAvatar = async () => {
+  const pickAvatar = useCallback(async () => {
     if (uploading) return;
 
     try {
@@ -167,7 +202,6 @@ export default function ProfileScreen() {
       if (result.canceled || !result.assets[0]) return;
 
       const { data, error } = await supabase.auth.getUser();
-
       if (error) throw error;
 
       const user = data.user;
@@ -179,34 +213,28 @@ export default function ProfileScreen() {
 
       setUploading(true);
 
-      const path = await uploadAvatar(
-        result.assets[0].uri,
-        user.id
-      );
-
+      const path = await uploadAvatar(result.assets[0].uri, user.id);
       const url = await getAvatarSignedUrl(path);
 
       setAvatarPath(path);
       setAvatarUrl(url);
 
       Alert.alert(
-        'Avatar ready',
-        'Your new profile picture is ready. Save your profile to confirm.'
+        'Photo uploaded',
+        'Your new photo is ready. Save your profile to confirm the change.'
       );
     } catch (error) {
       Alert.alert(
         'Photo upload failed',
-        error instanceof Error
-          ? error.message
-          : 'Please try again.'
+        error instanceof Error ? error.message : 'Please try again.'
       );
     } finally {
       setUploading(false);
     }
-  };
+  }, [uploading]);
 
-  const saveProfileData = async () => {
-    if (saving) return;
+  const saveProfileData = useCallback(async () => {
+    if (saving || uploading) return;
 
     const cleanUsername = username.trim();
     const cleanDisplayName = displayName.trim();
@@ -216,19 +244,19 @@ export default function ProfileScreen() {
       return;
     }
 
-    if (/\s/.test(cleanUsername)) {
+    if (!/^[a-zA-Z0-9_.-]{2,30}$/.test(cleanUsername)) {
       Alert.alert(
         'Invalid username',
-        'Usernames cannot contain spaces.'
+        'Use 2–30 letters, numbers, underscores, dots or hyphens. Do not use spaces.'
       );
       return;
     }
 
     setSaving(true);
+    Keyboard.dismiss();
 
     try {
       const { data, error } = await supabase.auth.getUser();
-
       if (error) throw error;
 
       const user = data.user;
@@ -238,115 +266,52 @@ export default function ProfileScreen() {
         return;
       }
 
-      const updatedProfile = await saveProfile({
+      const updated = await saveProfile({
         id: user.id,
         username: cleanUsername,
         display_name:
-          cleanDisplayName ||
-          user.email?.split('@')[0] ||
-          'BRITUME User',
+          cleanDisplayName || user.email?.split('@')[0] || 'BRITUME User',
         avatar_path: avatarPath,
-        phone: user.user_metadata?.phone ?? null,
+        phone: user.phone ?? null,
       });
 
-      if (!updatedProfile) {
+      if (!updated) {
         Alert.alert(
           'Profile not saved',
-          'Check your Supabase profile table and try again.'
+          'The save failed. Check your connection, username availability and Supabase permissions.'
         );
         return;
       }
 
-      setProfile(updatedProfile);
-      setUsername(updatedProfile.username ?? '');
-      setDisplayName(updatedProfile.display_name ?? '');
-      setAvatarPath(updatedProfile.avatar_path);
+      setProfile(updated);
+      setUsername(updated.username ?? '');
+      setDisplayName(updated.display_name ?? '');
+      setAvatarPath(updated.avatar_path ?? null);
 
-      Alert.alert(
-        'Identity updated',
-        'Your BRITUME profile has been saved successfully.'
-      );
+      Alert.alert('Profile saved', 'Your BRITUME profile has been updated.');
     } catch (error) {
       Alert.alert(
         'Could not save profile',
-        error instanceof Error
-          ? error.message
-          : 'Please check your connection and try again.'
+        error instanceof Error ? error.message : 'Please try again.'
       );
     } finally {
       setSaving(false);
     }
-  };
+  }, [username, displayName, avatarPath, saving, uploading]);
 
-  const showComingSoon = (feature: string) => {
+  const comingSoon = useCallback((name: string) => {
     Alert.alert(
-      feature,
+      name,
       'This creator tool is planned for a future BRITUME update.'
     );
-  };
-
-  const GlassCard = ({
-    children,
-    style,
-  }: {
-    children: React.ReactNode;
-    style?: object;
-  }) => (
-    <View style={[styles.glassCard, style]}>
-      {children}
-    </View>
-  );
-
-  const StudioCard = ({
-    symbol,
-    title,
-    subtitle,
-    color,
-    onPress,
-  }: {
-    symbol: string;
-    title: string;
-    subtitle: string;
-    color: string;
-    onPress: () => void;
-  }) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}. ${subtitle}`}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.studioCard,
-        { borderColor: `${color}55` },
-        pressed && styles.pressed,
-      ]}
-    >
-      <View
-        style={[
-          styles.studioIcon,
-          { backgroundColor: `${color}18` },
-        ]}
-      >
-        <Text style={[styles.studioSymbol, { color }]}>
-          {symbol}
-        </Text>
-      </View>
-
-      <Text style={styles.studioTitle}>{title}</Text>
-      <Text style={styles.studioSubtitle}>{subtitle}</Text>
-      <Text style={[styles.studioAction, { color }]}>
-        Explore →
-      </Text>
-    </Pressable>
-  );
+  }, []);
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <StatusBar barStyle="light-content" />
-        <ActivityIndicator size="large" color={COLORS.blue} />
-        <Text style={styles.loadingText}>
-          Entering your universe…
-        </Text>
+        <StatusBar barStyle="dark-content" backgroundColor={C.background} />
+        <ActivityIndicator size="large" color={C.blue} />
+        <Text style={styles.muted}>Loading your BRITUME profile…</Text>
       </View>
     );
   }
@@ -354,12 +319,13 @@ export default function ProfileScreen() {
   if (!profile) {
     return (
       <View style={styles.centered}>
-        <StatusBar barStyle="light-content" />
-        <Text style={styles.emptyTitle}>Your universe awaits</Text>
-        <Text style={styles.mutedText}>
-          Sign in to load your BRITUME profile, or try loading it again.
+        <StatusBar barStyle="dark-content" backgroundColor={C.background} />
+        <Text style={styles.heading}>Your profile awaits</Text>
+        <Text style={styles.muted}>
+          Sign in to view your profile, then try again.
         </Text>
         <Pressable
+          accessibilityRole="button"
           onPress={() => void loadProfile()}
           style={styles.primaryButton}
         >
@@ -370,100 +336,79 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={COLORS.background}
-      />
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor={C.background} />
 
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       >
-        {/* Header */}
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.kicker}>B R I T U M E</Text>
-            <Text style={styles.pageHeading}>Your Universe</Text>
+            <Text style={styles.brand}>BRITUME</Text>
+            <Text style={styles.heading}>Your Universe</Text>
+            <Text style={styles.tagline}>See Beyond. Move Forward.</Text>
           </View>
-
-          <View style={styles.statusPill}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>MY PROFILE</Text>
+          <View style={styles.profilePill}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.pillText}>MY PROFILE</Text>
           </View>
         </View>
 
-        {/* Profile identity */}
-        <GlassCard style={styles.heroCard}>
-          <View pointerEvents="none" style={styles.ambientGlow} />
-
-          <View style={styles.avatarArea}>
-            <View style={styles.outerOrbit}>
-              <View style={styles.middleOrbit}>
-                <View style={styles.avatarFrame}>
-                  {avatarUrl ? (
-                    <Image
-                      source={{ uri: avatarUrl }}
-                      style={styles.avatar}
-                      accessibilityLabel="Profile picture"
-                    />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarLetter}>B</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={pickAvatar}
-              disabled={uploading}
-              style={styles.avatarEditButton}
-            >
-              {uploading ? (
-                <ActivityIndicator
-                  size="small"
-                  color={COLORS.background}
+        <GlassCard style={styles.hero}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatarFrame}>
+              {avatarUrl ? (
+                <Image
+                  source={{ uri: avatarUrl }}
+                  style={styles.avatar}
+                  accessibilityLabel="Profile picture"
                 />
               ) : (
-                <Text style={styles.avatarEditSymbol}>✎</Text>
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarLetter}>B</Text>
+                </View>
               )}
-            </Pressable>
+            </View>
           </View>
 
           <Text style={styles.displayName}>
             {displayName || 'Your Display Name'}
           </Text>
-
-          <Text style={styles.username}>
-            @{username || 'yourusername'}
-          </Text>
-
-          <Text style={styles.profileDescription}>
+          <Text style={styles.handle}>@{username || 'yourusername'}</Text>
+          <Text style={styles.heroDescription}>
             Your world. Your vision. Your creations.
           </Text>
 
           <Pressable
+            accessibilityRole="button"
             onPress={pickAvatar}
             disabled={uploading}
             style={({ pressed }) => [
               styles.secondaryButton,
               pressed && styles.pressed,
+              uploading && styles.disabled,
             ]}
           >
-            <Text style={styles.secondaryButtonText}>
-              {uploading ? 'Uploading photo…' : '✧  Change profile photo'}
-            </Text>
+            {uploading ? (
+              <ActivityIndicator color={C.blueDark} />
+            ) : (
+              <Text style={styles.secondaryButtonText}>
+                ✧  Change profile photo
+              </Text>
+            )}
           </Pressable>
         </GlassCard>
 
-        {/* Edit identity */}
-        <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeading}>
           <Text style={styles.sectionTitle}>Your identity</Text>
-          <Text style={styles.sectionCaption}>PERSONALIZE</Text>
+          <Text style={styles.sectionNote}>PERSONALIZE</Text>
         </View>
 
         <GlassCard>
@@ -472,10 +417,13 @@ export default function ProfileScreen() {
             value={username}
             onChangeText={setUsername}
             placeholder="yourhandle"
-            placeholderTextColor="#74819F"
+            placeholderTextColor="#91A2B8"
             autoCapitalize="none"
             autoCorrect={false}
+            spellCheck={false}
             maxLength={30}
+            returnKeyType="next"
+            blurOnSubmit={false}
             accessibilityLabel="Username"
             style={styles.input}
           />
@@ -485,9 +433,11 @@ export default function ProfileScreen() {
             value={displayName}
             onChangeText={setDisplayName}
             placeholder="Your display name"
-            placeholderTextColor="#74819F"
+            placeholderTextColor="#91A2B8"
             autoCapitalize="words"
+            autoCorrect={false}
             maxLength={60}
+            returnKeyType="done"
             accessibilityLabel="Display name"
             style={styles.input}
           />
@@ -498,399 +448,337 @@ export default function ProfileScreen() {
             disabled={saving || uploading}
             style={({ pressed }) => [
               styles.primaryButton,
-              (saving || uploading) && styles.disabledButton,
               pressed && styles.pressed,
+              (saving || uploading) && styles.disabled,
             ]}
           >
             {saving ? (
-              <ActivityIndicator color={COLORS.background} />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.primaryButtonText}>
-                Save changes  →
-              </Text>
+              <Text style={styles.primaryButtonText}>Save changes  →</Text>
             )}
           </Pressable>
         </GlassCard>
 
-        {/* Creator Room */}
-        <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeading}>
           <View>
             <Text style={styles.sectionTitle}>Creator Room</Text>
-            <Text style={styles.sectionDescription}>
-              Your tools. Your imagination.
+            <Text style={styles.sectionSubheading}>
+              Tools for your next idea
             </Text>
           </View>
-
           <Text style={styles.sparkle}>✦</Text>
         </View>
 
-        <View style={styles.studioGrid}>
-          <StudioCard
+        <View style={styles.toolGrid}>
+          <ToolCard
             symbol="♫"
             title="Music Studio"
             subtitle="Beats and music"
-            color={COLORS.blue}
-            onPress={() => showComingSoon('Music Studio')}
+            onPress={() => comingSoon('Music Studio')}
           />
-
-          <StudioCard
+          <ToolCard
             symbol="▧"
             title="Photo Lab"
             subtitle="Edit your photos"
-            color={COLORS.purple}
-            onPress={() => showComingSoon('Photo Lab')}
+            onPress={() => comingSoon('Photo Lab')}
           />
-
-          <StudioCard
+          <ToolCard
             symbol="✧"
             title="Cartoon Studio"
-            subtitle="Build your scenes"
-            color={COLORS.gold}
-            onPress={() => showComingSoon('Cartoon Studio')}
+            subtitle="Create scenes"
+            onPress={() => comingSoon('Cartoon Studio')}
           />
-
-          <StudioCard
+          <ToolCard
             symbol="◈"
             title="My Creations"
-            subtitle="Your creative portfolio"
-            color={COLORS.green}
-            onPress={() => showComingSoon('My Creations')}
+            subtitle="Your portfolio"
+            onPress={() => comingSoon('My Creations')}
           />
         </View>
 
-        {/* Profile footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerLogo}>BRITUME</Text>
-          <Text style={styles.footerText}>
-            SEE BEYOND. MOVE FORWARD.
-          </Text>
+          <Text style={styles.footerBrand}>BRITUME</Text>
+          <Text style={styles.footerTagline}>SEE BEYOND. MOVE FORWARD.</Text>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: C.background,
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 22,
-    paddingBottom: 40,
-    gap: 18,
+    paddingTop: 20,
+    paddingBottom: 42,
+    gap: 17,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: COLORS.background,
+    backgroundColor: C.background,
     gap: 14,
-  },
-  loadingText: {
-    color: COLORS.muted,
-    fontSize: 14,
-    marginTop: 8,
-  },
-  emptyTitle: {
-    color: COLORS.white,
-    fontSize: 23,
-    fontWeight: '800',
-  },
-  mutedText: {
-    color: COLORS.muted,
-    fontSize: 14,
-    textAlign: 'center',
   },
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10,
   },
-  kicker: {
-    color: COLORS.gold,
+  brand: {
+    color: C.blueDark,
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 2.5,
+    letterSpacing: 3,
   },
-  pageHeading: {
-    color: COLORS.white,
+  heading: {
+    color: C.text,
     fontSize: 27,
     fontWeight: '900',
     marginTop: 5,
   },
-  statusPill: {
+  tagline: {
+    color: C.muted,
+    fontSize: 11,
+    marginTop: 4,
+  },
+  profilePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(87, 128, 190, 0.13)',
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: C.border,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.green,
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: C.green,
   },
-  statusText: {
-    color: COLORS.muted,
+  pillText: {
+    color: C.muted,
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.7,
   },
-  glassCard: {
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: COLORS.glass,
+  card: {
+    backgroundColor: C.glass,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 24,
+    borderColor: C.border,
+    borderRadius: 23,
     padding: 18,
+    shadowColor: '#7FA9DD',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    elevation: 2,
   },
-  heroCard: {
+  hero: {
     alignItems: 'center',
-    paddingTop: 25,
-    paddingBottom: 22,
+    paddingVertical: 24,
+    backgroundColor: 'rgba(255,255,255,0.9)',
   },
-  ambientGlow: {
-    position: 'absolute',
-    top: -90,
-    width: 220,
-    height: 180,
-    borderRadius: 110,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(83, 102, 255, 0.10)',
-  },
-  avatarArea: {
-    width: 150,
-    height: 150,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  outerOrbit: {
-    width: 144,
-    height: 144,
-    borderRadius: 72,
-    borderWidth: 1.5,
-    borderColor: 'rgba(101, 217, 255, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  middleOrbit: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+  avatarRing: {
+    width: 124,
+    height: 124,
+    borderRadius: 62,
     borderWidth: 3,
-    borderColor: 'rgba(165, 139, 255, 0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#C6DFFF',
+    padding: 5,
+    marginBottom: 14,
   },
   avatarFrame: {
-    width: 116,
-    height: 116,
+    flex: 1,
     borderRadius: 58,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: COLORS.gold,
-    backgroundColor: COLORS.surface,
+    backgroundColor: C.paleBlue,
   },
   avatar: {
     width: '100%',
     height: '100%',
   },
-  avatarPlaceholder: {
+  avatarFallback: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#243359',
   },
   avatarLetter: {
-    color: COLORS.gold,
-    fontSize: 46,
-    fontWeight: '900',
-  },
-  avatarEditButton: {
-    position: 'absolute',
-    right: 0,
-    bottom: 3,
-    width: 35,
-    height: 35,
-    borderRadius: 18,
-    backgroundColor: COLORS.blue,
-    borderWidth: 3,
-    borderColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEditSymbol: {
-    color: COLORS.background,
-    fontSize: 19,
+    color: C.blue,
+    fontSize: 45,
     fontWeight: '900',
   },
   displayName: {
-    color: COLORS.white,
-    fontSize: 23,
+    color: C.text,
+    fontSize: 22,
     fontWeight: '900',
     textAlign: 'center',
   },
-  username: {
-    color: COLORS.blue,
+  handle: {
+    color: C.blueDark,
     fontSize: 14,
     marginTop: 5,
   },
-  profileDescription: {
-    color: COLORS.muted,
+  heroDescription: {
+    color: C.muted,
     fontSize: 12,
-    marginTop: 12,
-    marginBottom: 17,
     textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 16,
   },
   secondaryButton: {
     paddingVertical: 11,
     paddingHorizontal: 17,
     borderRadius: 14,
+    backgroundColor: C.paleBlue,
     borderWidth: 1,
-    borderColor: 'rgba(101, 217, 255, 0.4)',
-    backgroundColor: 'rgba(101, 217, 255, 0.07)',
+    borderColor: C.border,
   },
   secondaryButtonText: {
-    color: COLORS.blue,
+    color: C.blueDark,
     fontSize: 12,
     fontWeight: '800',
   },
-  sectionHeader: {
+  sectionHeading: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 3,
+    marginTop: 2,
   },
   sectionTitle: {
-    color: COLORS.white,
+    color: C.text,
     fontSize: 19,
     fontWeight: '900',
   },
-  sectionCaption: {
-    color: COLORS.gold,
+  sectionNote: {
+    color: C.blueDark,
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
-  sectionDescription: {
-    color: COLORS.muted,
+  sectionSubheading: {
+    color: C.muted,
     fontSize: 12,
     marginTop: 4,
   },
   label: {
-    color: COLORS.muted,
+    color: C.muted,
     fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1.5,
-    marginTop: 8,
+    letterSpacing: 1.2,
+    marginTop: 7,
     marginBottom: 8,
   },
   input: {
     minHeight: 49,
-    backgroundColor: 'rgba(4, 9, 22, 0.58)',
-    borderColor: 'rgba(151, 174, 255, 0.22)',
+    backgroundColor: '#F8FBFF',
+    borderColor: C.border,
     borderWidth: 1,
     borderRadius: 13,
-    color: COLORS.white,
+    color: C.text,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 14,
-    marginBottom: 12,
+    fontSize: 15,
+    marginBottom: 13,
   },
   primaryButton: {
-    minHeight: 50,
+    minHeight: 49,
     borderRadius: 15,
-    backgroundColor: COLORS.blue,
+    backgroundColor: C.blue,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 13,
-    marginTop: 6,
+    marginTop: 5,
   },
   primaryButtonText: {
-    color: COLORS.background,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
   },
-  disabledButton: {
+  disabled: {
     opacity: 0.55,
   },
-  studioGrid: {
+  toolGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 11,
+    gap: 12,
   },
-  studioCard: {
-    width: '48%',
+  toolCard: {
     flexGrow: 1,
-    flexBasis: '45%',
-    minHeight: 158,
+    flexBasis: '44%',
+    minHeight: 150,
     padding: 14,
-    borderRadius: 20,
+    borderRadius: 19,
     borderWidth: 1,
-    backgroundColor: 'rgba(25, 33, 58, 0.72)',
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
-  studioIcon: {
-    width: 42,
-    height: 42,
+  toolIcon: {
+    width: 41,
+    height: 41,
     borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    backgroundColor: C.paleBlue,
+    marginBottom: 11,
   },
-  studioSymbol: {
-    fontSize: 25,
+  toolSymbol: {
+    color: C.blueDark,
+    fontSize: 23,
     fontWeight: '800',
   },
-  studioTitle: {
-    color: COLORS.white,
+  toolTitle: {
+    color: C.text,
     fontSize: 13,
     fontWeight: '900',
   },
-  studioSubtitle: {
-    color: COLORS.muted,
+  toolSubtitle: {
+    color: C.muted,
     fontSize: 10,
     marginTop: 5,
   },
-  studioAction: {
+  toolAction: {
+    color: C.blueDark,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 12,
   },
   sparkle: {
-    color: COLORS.purple,
+    color: C.purple,
     fontSize: 25,
   },
   pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.985 }],
+    opacity: 0.78,
   },
   footer: {
     alignItems: 'center',
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 5,
   },
-  footerLogo: {
-    color: COLORS.gold,
+  footerBrand: {
+    color: C.blueDark,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 4,
   },
-  footerText: {
-    color: '#7685A8',
+  footerTagline: {
+    color: C.muted,
     fontSize: 9,
-    letterSpacing: 1.5,
+    letterSpacing: 1.3,
     marginTop: 7,
+  },
+  muted: {
+    color: C.muted,
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

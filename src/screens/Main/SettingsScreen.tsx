@@ -432,6 +432,9 @@ export default function SettingsScreen({
       case 'Account':
         navigation.navigate('PROFILE');
         break;
+            case 'Manage Categories':
+      navigation.navigate('ManageCategories');
+      break;
       case 'Security':
         navigation.navigate('Security');
         break;

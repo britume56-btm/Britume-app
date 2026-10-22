@@ -57,6 +57,7 @@ export default function AuthGate() {
         <Text style={styles.body}>
           Connect with your world. Discover more. Move forward.
         </Text>
+
         <Button label="LOG IN" onPress={() => setMode('signin')} />
         <Button
           label="CREATE NEW ACCOUNT"
@@ -87,35 +88,18 @@ function Screen({ children }: { children: React.ReactNode }) {
 }
 
 function AccountScreen({ onBack }: { onBack: () => void }) {
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function createAccount() {
-    const value = identifier.trim();
-    const isEmail = value.includes('@');
-    const email = value.toLowerCase();
+    const value = email.trim().toLowerCase();
 
-    if (!value) {
-      Alert.alert('Required', 'Enter your email address or phone number.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      Alert.alert('Email required', 'Enter a valid email address.');
       return;
     }
-
-    if (isEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      Alert.alert('Invalid email', 'Enter a valid email address.');
-      return;
-    }
-
-    if (!isEmail && !/^\+[1-9]\d{7,14}$/.test(value.replace(/[\s()-]/g, ''))) {
-      Alert.alert(
-        'Phone number format',
-        'Use international format, including your country code, e.g. +267XXXXXXXX.'
-      );
-      return;
-    }
-
-    const phone = value.replace(/[\s()-]/g, '');
 
     if (password.length < 8) {
       Alert.alert('Password too short', 'Use at least 8 characters.');
@@ -130,18 +114,13 @@ function AccountScreen({ onBack }: { onBack: () => void }) {
     setLoading(true);
 
     try {
-      const result = isEmail
-        ? await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: 'britume://auth/callback',
-            },
-          })
-        : await supabase.auth.signUp({
-            phone,
-            password,
-          });
+      const result = await supabase.auth.signUp({
+        email: value,
+        password,
+        options: {
+          emailRedirectTo: 'britume://auth/callback',
+        },
+      });
 
       if (result.error) {
         Alert.alert('Registration failed', result.error.message);
@@ -150,15 +129,12 @@ function AccountScreen({ onBack }: { onBack: () => void }) {
 
       if (result.data.session) {
         Alert.alert('Welcome to BRITUME', 'Your account is ready.');
-        return;
+      } else {
+        Alert.alert(
+          'Verify your account',
+          'Check your email for the verification link before logging in.'
+        );
       }
-
-      Alert.alert(
-        'Verify your account',
-        isEmail
-          ? 'Check your email for the verification link before logging in.'
-          : 'Check your SMS for the verification code. Complete phone verification before logging in.'
-      );
     } catch {
       Alert.alert('Connection error', 'Please try again.');
     } finally {
@@ -172,16 +148,17 @@ function AccountScreen({ onBack }: { onBack: () => void }) {
       <View style={styles.card}>
         <Text style={styles.title}>Create your account</Text>
         <Text style={styles.body}>
-          Join BRITUME using your email address or phone number.
+          Join BRITUME using your email address.
         </Text>
 
         <Field
-          label="Email address or phone number"
-          value={identifier}
-          onChangeText={setIdentifier}
-          placeholder="Email or +267XXXXXXXX"
-          keyboardType="default"
+          label="Email address"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          keyboardType="email-address"
         />
+
         <Field
           label="Password"
           value={password}
@@ -189,6 +166,7 @@ function AccountScreen({ onBack }: { onBack: () => void }) {
           placeholder="At least 8 characters"
           secure
         />
+
         <Field
           label="Confirm password"
           value={confirm}
@@ -215,38 +193,36 @@ function SignInScreen({
   onBack: () => void;
   onForgotPassword: () => void;
 }) {
-  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function signIn() {
-    const value = identifier.trim();
-    const isEmail = value.includes('@');
+    const value = email.trim().toLowerCase();
 
     if (!value || !password) {
-      Alert.alert('Missing details', 'Enter your email or phone number and password.');
+      Alert.alert(
+        'Missing details',
+        'Enter your email address and password.'
+      );
       return;
     }
 
-    if (!isEmail && !/^\+[1-9]\d{7,14}$/.test(value.replace(/[\s()-]/g, ''))) {
-      Alert.alert(
-        'Check your phone number',
-        'Include your international country code, e.g. +267XXXXXXXX.'
-      );
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      Alert.alert('Invalid email', 'Enter a valid email address.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const result = await supabase.auth.signInWithPassword(
-        isEmail
-          ? { email: value.toLowerCase(), password }
-          : { phone: value.replace(/[\s()-]/g, ''), password }
-      );
+      const { error } = await supabase.auth.signInWithPassword({
+        email: value,
+        password,
+      });
 
-      if (result.error) {
-        Alert.alert('Login failed', result.error.message);
+      if (error) {
+        Alert.alert('Login failed', error.message);
       }
     } catch {
       Alert.alert('Connection error', 'Please try again.');
@@ -260,15 +236,18 @@ function SignInScreen({
       <Header />
       <View style={styles.card}>
         <Text style={styles.title}>Log in to BRITUME</Text>
-        <Text style={styles.body}>Welcome back. Your world awaits.</Text>
+        <Text style={styles.body}>
+          Welcome back. Your world awaits.
+        </Text>
 
         <Field
-          label="Email address or phone number"
-          value={identifier}
-          onChangeText={setIdentifier}
-          placeholder="Email or +267XXXXXXXX"
-          keyboardType="default"
+          label="Email address"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          keyboardType="email-address"
         />
+
         <Field
           label="Password"
           value={password}
@@ -304,7 +283,10 @@ function RecoveryScreen({ onBack }: { onBack: () => void }) {
     const value = email.trim().toLowerCase();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      Alert.alert('Email required', 'Enter the email address linked to your account.');
+      Alert.alert(
+        'Email required',
+        'Enter the email address linked to your account.'
+      );
       return;
     }
 
@@ -339,6 +321,7 @@ function RecoveryScreen({ onBack }: { onBack: () => void }) {
         <Text style={styles.body}>
           We will send password recovery instructions to your email.
         </Text>
+
         <Field
           label="Email address"
           value={email}
@@ -346,6 +329,7 @@ function RecoveryScreen({ onBack }: { onBack: () => void }) {
           placeholder="you@example.com"
           keyboardType="email-address"
         />
+
         <Button
           label={loading ? 'SENDING…' : 'SEND RESET LINK'}
           onPress={() => void sendResetLink()}
@@ -564,12 +548,5 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
-  },
-  footer: {
-    color: '#666666',
-    textAlign: 'center',
-    fontSize: 10,
-    letterSpacing: 2,
-    marginTop: 24,
   },
 });

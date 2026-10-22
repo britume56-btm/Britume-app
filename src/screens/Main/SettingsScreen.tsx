@@ -47,6 +47,11 @@ const DEFAULT_PREFERENCES: Preferences = {
 const settingsSections = [
   {
     title: 'Account',
+      {
+    title: 'Manage Categories',
+    body: 'Choose which six shortcuts appear at the top of LIVING.',
+    route: 'ManageCategories',
+  },
     body: 'Edit your username, display name, and avatar.',
     route: 'PROFILE',
   },

@@ -63,8 +63,10 @@ function AdvancedLivePreview({ item, selected }: { item: ExpandedThemeItem; sele
     );
     rotationLoop.start();
     shimmerLoop.start();
-    return () => { rotationLoop.stop(); shimmerLoop.start(); };
-  }, []);
+    return () => {
+  rotationLoop.stop();
+  shimmerLoop.stop();
+};
 
   const spin = rotation.interpolate({
   inputRange: [0, 1],

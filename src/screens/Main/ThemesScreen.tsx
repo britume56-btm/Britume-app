@@ -66,7 +66,10 @@ function AdvancedLivePreview({ item, selected }: { item: ExpandedThemeItem; sele
     return () => { rotationLoop.stop(); shimmerLoop.start(); };
   }, []);
 
-  const spin = rotation.interpolate({ inputRange:, outputRange: ['0deg', '360deg'] });
+  const spin = rotation.interpolate({
+  inputRange: [0, 1],
+  outputRange: ['0deg', '360deg'],
+});
 
   // 1. Dynamic visual styles based on category configurations
   let containerStyle: any = { backgroundColor: '#FFFFFF', borderRadius: 16 };

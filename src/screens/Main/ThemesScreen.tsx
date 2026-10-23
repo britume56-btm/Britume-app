@@ -1,10 +1,10 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Easing,
-  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +17,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../../../lib/supabase';
 import type { RootStackParamList } from '../../navigation/types';
 import { THEME_PALETTES, useAppTheme } from '../../theme/AppThemeContext';
-import type { ThemeId, ThemePalette } from '../../theme/AppThemeContext';
+import type { ThemeId } from '../../theme/AppThemeContext';
 import {
   getPremiumEntitlement,
   hasPremiumAccess,
@@ -26,100 +26,203 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Themes'>;
 
-type ExpandedThemeItem = {
+type ThemeCategory = 'Galaxy' | 'Fluid / Gradient' | 'Fluffy' | 'Classic';
+
+type ThemeItem = {
   id: string;
   name: string;
-  category: 'Galaxy' | 'Fluid / Gradient' | 'Fluffy' | 'Classic';
+  category: ThemeCategory;
   description: string;
   premium?: boolean;
-  fontStyle: 'System' | 'Cursive' | 'Rounded' | 'Futuristic';
+  fontStyle: 'System' | 'Rounded' | 'Futuristic';
 };
 
-// Expanded list featuring your newly conceptualized premium design categories
-const THEME_COLLECTION: ExpandedThemeItem[] = [
-  { id: 'midnight', name: 'Midnight Classic', category: 'Classic', description: 'BRITUME signature premium dark and gold', fontStyle: 'System' },
-  { id: 'galaxy_supernova', name: 'Supernova Cosmic', category: 'Galaxy', description: 'Glow vectors and blinking stars blanketing the canvas', premium: true, fontStyle: 'Futuristic' },
-  { id: 'galaxy_andromeda', name: 'Andromeda Nebula', category: 'Galaxy', description: 'Cosmic violet dust fields with high contrast stellar spots', premium: true, fontStyle: 'Futuristic' },
-  { id: 'fluid_aurora', name: 'Aurora Borealis', category: 'Fluid / Gradient', description: 'Smooth moving gradient currents morphing across layers', fontStyle: 'System' },
-  { id: 'fluid_sunset', name: 'Neon Horizon', category: 'Fluid / Gradient', description: 'Vibrant neon pink, orange, and purple color merges', fontStyle: 'System' },
-  { id: 'fluffy_cloud', name: 'Cotton Dream', category: 'Fluffy', description: 'Pillowy soft shapes, pastel pinks, and ultra-high shadows', fontStyle: 'Rounded' },
-  { id: 'fluffy_lavender', name: 'Marshmallow Mist', category: 'Fluffy', description: 'Friendly rounded layouts in light cozy purple tints', fontStyle: 'Rounded' },
+const THEME_COLLECTION: ThemeItem[] = [
+  {
+    id: 'midnight',
+    name: 'Midnight Classic',
+    category: 'Classic',
+    description: 'BRITUME signature dark and gold experience.',
+    fontStyle: 'System',
+  },
+  {
+    id: 'galaxy_supernova',
+    name: 'Supernova Cosmic',
+    category: 'Galaxy',
+    description: 'A cosmic-inspired workspace with animated stars.',
+    premium: true,
+    fontStyle: 'Futuristic',
+  },
+  {
+    id: 'galaxy_andromeda',
+    name: 'Andromeda Nebula',
+    category: 'Galaxy',
+    description: 'A deep-space look with violet accents.',
+    premium: true,
+    fontStyle: 'Futuristic',
+  },
+  {
+    id: 'fluid_aurora',
+    name: 'Aurora Borealis',
+    category: 'Fluid / Gradient',
+    description: 'A cool, flowing colour-inspired workspace.',
+    fontStyle: 'System',
+  },
+  {
+    id: 'fluid_sunset',
+    name: 'Neon Horizon',
+    category: 'Fluid / Gradient',
+    description: 'A vivid sunset-inspired visual style.',
+    fontStyle: 'System',
+  },
+  {
+    id: 'fluffy_cloud',
+    name: 'Cotton Dream',
+    category: 'Fluffy',
+    description: 'Soft shapes and a light, gentle appearance.',
+    fontStyle: 'Rounded',
+  },
+  {
+    id: 'fluffy_lavender',
+    name: 'Marshmallow Mist',
+    category: 'Fluffy',
+    description: 'Rounded cards with lavender-inspired colours.',
+    fontStyle: 'Rounded',
+  },
 ];
 
-// Rich preview layer that morphs its inner content styling based on theme attributes
-function AdvancedLivePreview({ item, selected }: { item: ExpandedThemeItem; selected: boolean }) {
+function AdvancedLivePreview({
+  item,
+  selected,
+}: {
+  item: ThemeItem;
+  selected: boolean;
+}) {
   const rotation = useRef(new Animated.Value(0)).current;
-  const shimmer = useRef(new Animated.Value(0.3)).current;
+  const shimmer = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
     const rotationLoop = Animated.loop(
-      Animated.timing(rotation, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 12000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
     );
+
     const shimmerLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0.3, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
-      ])
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0.35,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
     );
+
     rotationLoop.start();
     shimmerLoop.start();
+
     return () => {
-  rotationLoop.stop();
-  shimmerLoop.stop();
-};
+      rotationLoop.stop();
+      shimmerLoop.stop();
+    };
+  }, [rotation, shimmer]);
 
   const spin = rotation.interpolate({
-  inputRange: [0, 1],
-  outputRange: ['0deg', '360deg'],
-});
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
-  // 1. Dynamic visual styles based on category configurations
-  let containerStyle: any = { backgroundColor: '#FFFFFF', borderRadius: 16 };
-  let cardTitleFont: any = { fontWeight: '900', fontSize: 20 };
+  const darkPreview =
+    item.category === 'Galaxy' ||
+    item.category === 'Fluid / Gradient';
 
-  if (item.category === 'Galaxy') {
-    containerStyle = { backgroundColor: '#0B0F19', borderColor: '#1F293D' };
-  } else if (item.category === 'Fluid / Gradient') {
-    containerStyle = { backgroundColor: '#1A102F', borderColor: '#3A205A' };
-  } else if (item.category === 'Fluffy') {
-    containerStyle = { backgroundColor: '#FFF5F7', borderRadius: 28, shadowRadius: 20, shadowOpacity: 0.1 };
-  }
+  const previewBackground =
+    item.category === 'Galaxy'
+      ? '#0B0F19'
+      : item.category === 'Fluid / Gradient'
+        ? '#19112B'
+        : item.category === 'Fluffy'
+          ? '#FFF4F8'
+          : '#17191F';
 
-  // 2. Adjust font variables inline dynamically
-  if (item.fontStyle === 'Futuristic') cardTitleFont.letterSpacing = 2;
-  if (item.fontStyle === 'Rounded') cardTitleFont.fontWeight = '600';
+  const titleColor = darkPreview ? '#FFFFFF' : '#263247';
+  const accentColor = item.category === 'Galaxy' ? '#D4AF37' : '#669EFF';
 
   return (
-    <View style={[styles.advancedPreview, containerStyle, selected && { borderWidth: 2, borderColor: '#D4AF37' }]}>
-      {/* Galaxy Effect Layer: Star maps floating in space */}
+    <View
+      style={[
+        styles.preview,
+        { backgroundColor: previewBackground },
+        item.category === 'Fluffy' && styles.fluffyPreview,
+        selected && styles.selectedPreview,
+      ]}
+    >
       {item.category === 'Galaxy' && (
-        <Animated.View style={[styles.cosmicOrbitMask, { transform: [{ rotate: spin }] }]}>
-          <Text style={[styles.stellarParticle, { top: 20, left: 40 }]}>⭐</Text>
-          <Text style={[styles.stellarParticle, { bottom: 30, right: 50 }]}>✨</Text>
-          <Animated.Text style={[styles.stellarParticle, { top: 60, right: 30, opacity: shimmer }]}>🌟</Animated.Text>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.orbit,
+            { transform: [{ rotate: spin }] },
+          ]}
+        >
+          <Text style={[styles.star, { top: 12, left: 24 }]}>✦</Text>
+          <Text style={[styles.star, { bottom: 15, right: 30 }]}>✧</Text>
+          <Animated.Text
+            style={[
+              styles.star,
+              { top: 48, right: 48, opacity: shimmer },
+            ]}
+          >
+            ✦
+          </Animated.Text>
         </Animated.View>
       )}
 
-      {/* Fluffy Effect Layer: Cloud background vectors */}
       {item.category === 'Fluffy' && (
-        <View style={styles.fluffyCloudOverlay}>
-          <Text style={{ fontSize: 40, opacity: 0.12, position: 'absolute', right: 10, top: 10 }}>☁️</Text>
-        </View>
+        <Text style={styles.cloudDecoration}>☁</Text>
       )}
 
-      <View style={styles.previewMetaWrapper}>
-        <Text style={[styles.previewCategoryKicker, { color: item.category === 'Galaxy' ? '#D4AF37' : '#71839D' }]}>
-          {item.category.toUpperCase()} WORKSPACE
-        </Text>
-        <Text style={[cardTitleFont, { color: item.category === 'Galaxy' || item.category === 'Fluid / Gradient' ? '#FFFFFF' : '#203450', marginTop: 4 }]}>
-          {item.name}
-        </Text>
-        <Text style={{ fontSize: 11, color: '#91A2B8', marginTop: 2 }}>Template Architecture: {item.fontStyle}</Text>
+      <Text style={[styles.categoryKicker, { color: accentColor }]}>
+        {item.category.toUpperCase()} WORKSPACE
+      </Text>
 
-        <View style={[styles.sampleGlassElement, item.category === 'Fluffy' && { borderRadius: 20, backgroundColor: '#FFFFFF' }]}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: item.category === 'Galaxy' ? '#FFFFFF' : '#203450' }}>Feed Layout Grid</Text>
-          <View style={[styles.sampleBarIndicator, { backgroundColor: item.category === 'Galaxy' ? '#D4AF37' : '#5598F5' }]} />
+      <Text
+        style={[
+          styles.previewTitle,
+          { color: titleColor },
+          item.fontStyle === 'Futuristic' && styles.futuristicTitle,
+          item.fontStyle === 'Rounded' && styles.roundedTitle,
+        ]}
+      >
+        {item.name}
+      </Text>
+
+      <Text style={styles.previewSubtitle}>
+        {item.fontStyle} visual style
+      </Text>
+
+      <View
+        style={[
+          styles.sampleGlass,
+          item.category === 'Fluffy' && styles.fluffySample,
+        ]}
+      >
+        <View style={styles.sampleHeader}>
+          <View style={[styles.sampleDot, { backgroundColor: accentColor }]} />
+          <View style={[styles.sampleLine, { backgroundColor: accentColor }]} />
         </View>
+        <View style={styles.sampleLineLong} />
+        <View style={styles.sampleLineShort} />
       </View>
     </View>
   );
@@ -127,59 +230,118 @@ function AdvancedLivePreview({ item, selected }: { item: ExpandedThemeItem; sele
 
 export default function ThemesScreen({ navigation }: Props) {
   const { themeId, customThemeName, palette, applyTheme } = useAppTheme();
+
   const [userId, setUserId] = useState<string | null>(null);
   const [screenLoading, setScreenLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [premiumActive, setPremiumActive] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadAccountData() {
       try {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          setUserId(data.user.id);
-          const entitlement = await getPremiumEntitlement(data.user.id);
-          setPremiumActive(hasPremiumAccess(entitlement));
+        const { data, error } = await supabase.auth.getUser();
+
+        if (error) {
+          throw error;
         }
-      } catch (e) {
-        console.warn(e);
+
+        if (!mounted) return;
+
+        if (data.user) {
+          setUserId(data.user.id);
+
+          const entitlement = await getPremiumEntitlement(data.user.id);
+
+          if (mounted) {
+            setPremiumActive(hasPremiumAccess(entitlement));
+          }
+        }
+      } catch (error) {
+        console.warn('Unable to load theme account information:', error);
       } finally {
-        setScreenLoading(false);
+        if (mounted) {
+          setScreenLoading(false);
+        }
       }
     }
+
     void loadAccountData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const handleApplyLayoutTheme = async (item: ExpandedThemeItem) => {
+  const handleApplyTheme = async (item: ThemeItem) => {
+    if (saving) return;
+
     if (!userId) {
-      Alert.alert('Sign in required', 'Please authenticate your account to sync templates.');
+      Alert.alert(
+        'Sign in required',
+        'Sign in to your BRITUME account before saving a theme.',
+      );
       return;
     }
+
     if (item.premium && !premiumActive) {
-      Alert.alert('Premium Blueprint', 'Unlock this theme catalog by managing your subscription profile.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'View Premium', onPress: () => navigation.navigate('Premium') }
-      ]);
+      Alert.alert(
+        'Premium theme',
+        'This theme requires premium access.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'View Premium',
+            onPress: () => navigation.navigate('Premium'),
+          },
+        ],
+      );
       return;
     }
 
     setSaving(true);
-    try {
-      // Map expanded category ids down to keys configured inside your THEME_PALETTES global styles engine
-      const basicPaletteId = item.id.startsWith('galaxy') ? 'midnight' : 'ocean';
-      const targetPalette = THEME_PALETTES[basicPaletteId as ThemeId] || THEME_PALETTES.midnight;
 
-      await saveAccountPreferences(userId, {
+    try {
+      // These visual templates currently use the existing base palettes.
+      // They do not create separate colour palettes in the theme engine.
+      const basicPaletteId: ThemeId = item.id.startsWith('galaxy')
+        ? 'midnight'
+        : 'ocean';
+
+      const targetPalette =
+        THEME_PALETTES[basicPaletteId] ?? THEME_PALETTES.midnight;
+
+      const { error } = await saveAccountPreferences(userId, {
         theme_id: basicPaletteId,
         custom_theme_name: item.name,
         background_path: null,
         custom_accent_color: targetPalette.accent,
       });
 
-      applyTheme(basicPaletteId, item.name, null, targetPalette.accent);
-      Alert.alert('Theme Injected', `${item.name} custom structural profiles applied successfully.`);
-    } catch {
-      Alert.alert('Sync Error', 'Could not cache layout variables.');
+      // Supports either a returned Supabase-style error object or
+      // a service that throws when saving fails.
+      if (error) {
+        throw error;
+      }
+
+      applyTheme(
+        basicPaletteId,
+        item.name,
+        null,
+        targetPalette.accent,
+      );
+
+      Alert.alert(
+        'Theme applied',
+        `${item.name} has been selected.`,
+      );
+    } catch (error) {
+      console.warn('Unable to save theme:', error);
+      Alert.alert(
+        'Could not save theme',
+        'Your theme could not be synced. Check your connection and try again.',
+      );
     } finally {
       setSaving(false);
     }
@@ -187,34 +349,450 @@ export default function ThemesScreen({ navigation }: Props) {
 
   if (screenLoading) {
     return (
-      <View style={[styles.loadingScreen, { backgroundColor: palette.background }]}>
+      <View
+        style={[
+          styles.loadingScreen,
+          { backgroundColor: palette.background },
+        ]}
+      >
         <ActivityIndicator size="large" color={palette.accent} />
+        <Text style={[styles.loadingText, { color: palette.text }]}>
+          Loading themes...
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: palette.background }]}>
-      <View style={styles.customHeaderArea}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.circularBackIcon}>
-          <Ionicons name="arrow-back-outline" size={16} color={palette.text} />
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: palette.background },
+      ]}
+    >
+      <View style={styles.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => navigation.goBack()}
+          style={[
+            styles.backButton,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+            },
+          ]}
+        >
+          <Ionicons name="arrow-back" size={21} color={palette.text} />
         </Pressable>
-        <View>
-          <Text style={[styles.eyebrowText, { color: palette.accent }]}>BRITUME UNIVERSE CONFIG</Text>
-          <Text style={[styles.mainScreenTitle, { color: palette.text }]}>Visual Templates</Text>
+
+        <View style={styles.headerTitles}>
+          <Text style={[styles.eyebrow, { color: palette.accent }]}>
+            BRITUME PERSONALIZATION
+          </Text>
+          <Text style={[styles.screenTitle, { color: palette.text }]}>
+            Themes
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: palette.muted }]}>
+            Choose your workspace appearance.
+          </Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollCanvas} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionSubtitleHeader}>SELECT METRIC CORE EXPERIENCE</Text>
-        
-        <View style={styles.verticalGridList}>
-          {THEME_COLLECTION.map((item) => {
-            const isSelected = customThemeName === item.name || (themeId === item.id && !customThemeName);
-            return (
-              <View key={item.id} style={[styles.unifiedThemeCardContainer, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-                <AdvancedLivePreview item={item} selected={isSelected} />
-                
-                <View style={styles.cardDetailsSection}>
-                  <View style={styles.rowLabelContainer}>
-                    <Text style={[styles.themeLabelNameText, { color: palette.text }]}>{item.name}</Text>
+      {!userId && (
+        <View
+          style={[
+            styles.notice,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={20}
+            color={palette.accent}
+          />
+          <Text style={[styles.noticeText, { color: palette.text }]}>
+            Sign in to save and sync your selected theme.
+          </Text>
+        </View>
+      )}
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sectionHeading}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>
+            Visual collection
+          </Text>
+          <Text style={[styles.sectionDescription, { color: palette.muted }]}>
+            Preview a design before applying it.
+          </Text>
+        </View>
+
+        {THEME_COLLECTION.map((item) => {
+          const selected =
+            customThemeName === item.name ||
+            (!customThemeName && themeId === item.id);
+
+          return (
+            <View
+              key={item.id}
+              style={[
+                styles.themeCard,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: selected ? palette.accent : palette.border,
+                },
+              ]}
+            >
+              <AdvancedLivePreview item={item} selected={selected} />
+
+              <View style={styles.cardBody}>
+                <View style={styles.cardTitleRow}>
+                  <Text
+                    style={[styles.cardTitle, { color: palette.text }]}
+                  >
+                    {item.name}
+                  </Text>
+
+                  {item.premium && (
+                    <View style={styles.premiumBadge}>
+                      <Ionicons name="sparkles" size={12} color="#17130A" />
+                      <Text style={styles.premiumBadgeText}>PREMIUM</Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text
+                  style={[styles.description, { color: palette.muted }]}
+                >
+                  {item.description}
+                </Text>
+
+                <View style={styles.cardFooter}>
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: selected ? palette.accent : palette.muted },
+                    ]}
+                  >
+                    {selected ? 'Currently selected' : 'Available theme'}
+                  </Text>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Apply ${item.name}`}
+                    disabled={saving || selected}
+                    onPress={() => void handleApplyTheme(item)}
+                    style={[
+                      styles.applyButton,
+                      {
+                        backgroundColor: selected
+                          ? palette.surface
+                          : palette.accent,
+                        borderColor: palette.accent,
+                        opacity: saving ? 0.65 : 1,
+                      },
+                    ]}
+                  >
+                    {saving ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={selected ? palette.accent : '#17130A'}
+                      />
+                    ) : (
+                      <>
+                        <Text
+                          style={[
+                            styles.applyButtonText,
+                            { color: selected ? palette.accent : '#17130A' },
+                          ]}
+                        >
+                          {selected ? 'Selected' : 'Apply'}
+                        </Text>
+                        {!selected && (
+                          <Ionicons
+                            name="arrow-forward"
+                            size={15}
+                            color="#17130A"
+                          />
+                        )}
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+
+        <View style={styles.bottomNote}>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={18}
+            color={palette.accent}
+          />
+          <Text style={[styles.bottomNoteText, { color: palette.muted }]}>
+            Your selection is saved through your BRITUME account. Some visual
+            templates currently map to an existing base palette.
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 18,
+    gap: 14,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitles: {
+    flex: 1,
+  },
+  eyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  screenTitle: {
+    fontSize: 27,
+    fontWeight: '900',
+    marginTop: 3,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    marginTop: 3,
+  },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 18,
+    marginBottom: 8,
+    padding: 12,
+    gap: 9,
+    borderWidth: 1,
+    borderRadius: 15,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  scrollContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 34,
+  },
+  sectionHeading: {
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  sectionDescription: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  themeCard: {
+    borderWidth: 1,
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginBottom: 17,
+  },
+  preview: {
+    minHeight: 180,
+    padding: 18,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  selectedPreview: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#D4AF37',
+  },
+  fluffyPreview: {
+    borderRadius: 22,
+  },
+  orbit: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  star: {
+    position: 'absolute',
+    fontSize: 23,
+    color: '#D4AF37',
+  },
+  cloudDecoration: {
+    position: 'absolute',
+    right: 15,
+    top: 8,
+    fontSize: 54,
+    color: '#E7CBEF',
+    opacity: 0.65,
+  },
+  categoryKicker: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  previewTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  futuristicTitle: {
+    letterSpacing: 1.4,
+  },
+  roundedTitle: {
+    fontWeight: '700',
+  },
+  previewSubtitle: {
+    fontSize: 11,
+    color: '#91A2B8',
+    marginTop: 5,
+  },
+  sampleGlass: {
+    marginTop: 17,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(212,175,55,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.09)',
+  },
+  fluffySample: {
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderColor: '#F0DDE9',
+  },
+  sampleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 10,
+  },
+  sampleDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  sampleLine: {
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    opacity: 0.8,
+  },
+  sampleLineLong: {
+    width: '85%',
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(145,162,184,0.55)',
+    marginBottom: 7,
+  },
+  sampleLineShort: {
+    width: '55%',
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(145,162,184,0.3)',
+  },
+  cardBody: {
+    padding: 15,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#D4AF37',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  premiumBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#17130A',
+    letterSpacing: 0.5,
+  },
+  description: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 15,
+  },
+  statusText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  applyButton: {
+    minWidth: 94,
+    minHeight: 39,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  applyButtonText: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  bottomNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    marginTop: 4,
+    padding: 12,
+  },
+  bottomNoteText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 17,
+  },
+});

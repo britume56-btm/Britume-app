@@ -1,17 +1,28 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring, 
+  interpolateColor 
+} from 'react-native-reanimated';
+import { useCategoryStore, DEFAULTS, MAX_SHORTCUTS } from './useCategoryStore';
 
-const STORAGE_KEY = 'britume-living-categories-v1';
+// Simple platform haptic helper fallback
+const triggerHaptic = () => {
+  if (Platform.OS === 'ios') {
+    // Optional iOS physical system haptic if package installed
+  }
+};
 
 const CATEGORIES = [
   { id: 'SOCIAL', name: 'Social', icon: '👥' },
@@ -30,195 +41,145 @@ const CATEGORIES = [
   { id: 'SECURITY', name: 'Security', icon: '🔒' },
 ] as const;
 
-const DEFAULTS = [
-  'SOCIAL',
-  'CHAT',
-  'TECHNOLOGIES',
-  'TV',
-  'STUDIOS',
-  'WEAR',
-];
-
 const BLUE = '#5598F5';
 const TEXT = '#203450';
 const MUTED = '#71839D';
 
-export default function ManageCategoriesScreen() {
-  const [selected, setSelected] = useState<string[]>(DEFAULTS);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+// Component for Micro-Interaction Scale on individual list rows
+function CategoryRow({ category, active, disabled, onPress }: { 
+  category: typeof CATEGORIES[number]; 
+  active: boolean; 
+  disabled: boolean; 
+  onPress: () => void; 
+}) {
+  const scale = useSharedValue(1);
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-
-        if (stored) {
-          const parsed: unknown = JSON.parse(stored);
-
-          if (Array.isArray(parsed)) {
-            const valid = parsed.filter(
-              (id): id is string =>
-                typeof id === 'string' &&
-                CATEGORIES.some((category) => category.id === id),
-            );
-
-            if (active) setSelected(valid.slice(0, 6));
-          }
-        }
-      } catch {
-        Alert.alert(
-          'Could not load categories',
-          'Default categories will be shown.',
-        );
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    void load();
-
-    return () => {
-      active = false;
+  const animatedRowStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: withSpring(scale.value, { damping: 15 }) }],
     };
-  }, []);
-
-  async function toggleCategory(id: string) {
-    const alreadySelected = selected.includes(id);
-
-    if (!alreadySelected && selected.length >= 6) {
-      Alert.alert(
-        'Six categories maximum',
-        'Remove one of your current shortcuts before adding another.',
-      );
-      return;
-    }
-
-    const updated = alreadySelected
-      ? selected.filter((item) => item !== id)
-      : [...selected, id];
-
-    setSelected(updated);
-    setSaving(true);
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      setSelected(selected);
-      Alert.alert(
-        'Could not save',
-        'Your category changes were not saved. Please try again.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function resetDefaults() {
-    setSaving(true);
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULTS));
-      setSelected([...DEFAULTS]);
-    } catch {
-      Alert.alert('Reset failed', 'Could not restore the default categories.');
-    } finally {
-      setSaving(false);
-    }
-  }
+  });
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: active }}
+      disabled={disabled}
+      onPressIn={() => { scale.value = 0.97; }}
+      onPressOut={() => { scale.value = 1; }}
+      onPress={onPress}
     >
+      <Animated.View style={[
+        styles.category,
+        active && styles.categoryActive,
+        animatedRowStyle
+      ]}>
+        <View style={styles.categoryIcon}>
+          <Text style={styles.emoji}>{category.icon}</Text>
+        </View>
+
+        <Text style={styles.categoryName}>{category.name}</Text>
+
+        <View style={[styles.check, active && styles.checkActive]}>
+          <Text style={[styles.checkText, active && styles.checkTextActive]}>
+            {active ? '✓' : '+'}
+          </Text>
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+export default function ManageCategoriesScreen() {
+  const { 
+    selected, 
+    loading, 
+    saving, 
+    loadCategories, 
+    toggleCategory, 
+    resetDefaults 
+  } = useCategoryStore();
+
+  // Load configuration safely when mounting
+  useEffect(() => {
+    void loadCategories();
+  }, [loadCategories]);
+
+  // Reanimated 3 layout width tracking
+  const animatedWidthPercent = useSharedValue((selected.length / MAX_SHORTCUTS) * 100);
+
+  useEffect(() => {
+    animatedWidthPercent.value = withSpring((selected.length / MAX_SHORTCUTS) * 100, {
+      damping: 15,
+      stiffness: 90
+    });
+  }, [selected.length, animatedWidthPercent]);
+
+  const animatedProgressStyle = useAnimatedStyle(() => {
+    return {
+      width: `${animatedWidthPercent.value}%`,
+    };
+  });
+
+  const handleToggle = (id: string) => {
+    triggerHaptic();
+    void toggleCategory(
+      id,
+      () => Alert.alert('Six categories maximum', 'Remove one of your current shortcuts before adding another.'),
+      (errorMsg) => Alert.alert('Could not save', errorMsg)
+    );
+  };
+
+  const handleReset = () => {
+    triggerHaptic();
+    void resetDefaults((errorMsg) => Alert.alert('Reset failed', errorMsg));
+  };
+
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.brand}>BRITUME</Text>
       <Text style={styles.heading}>Manage Categories</Text>
       <Text style={styles.description}>
-        Choose the six shortcuts you want on LIVING. Other categories stay
-        available here.
+        Choose the six shortcuts you want on LIVING. Other categories stay available here.
       </Text>
 
       <View style={styles.counterCard}>
         <Text style={styles.counterTitle}>Your LIVING shortcuts</Text>
-        <Text style={styles.counter}>
-          {selected.length} of 6 selected
-        </Text>
+        <Text style={styles.counter}>{selected.length} of {MAX_SHORTCUTS} selected</Text>
         <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${(selected.length / 6) * 100}%` },
-            ]}
-          />
+          <Animated.View style={[styles.progressFill, animatedProgressStyle]} />
         </View>
       </View>
 
       {loading ? (
-        <ActivityIndicator color={BLUE} size="large" />
+        <ActivityIndicator color={BLUE} size="large" style={styles.loader} />
       ) : (
         <View style={styles.list}>
-          {CATEGORIES.map((category) => {
-            const active = selected.includes(category.id);
-
-            return (
-              <Pressable
-                key={category.id}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: active }}
-                onPress={() => void toggleCategory(category.id)}
-                disabled={saving}
-                style={({ pressed }) => [
-                  styles.category,
-                  active && styles.categoryActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.emoji}>{category.icon}</Text>
-                </View>
-
-                <Text style={styles.categoryName}>{category.name}</Text>
-
-                <View
-                  style={[
-                    styles.check,
-                    active && styles.checkActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.checkText,
-                      active && styles.checkTextActive,
-                    ]}
-                  >
-                    {active ? '✓' : '+'}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
+          {CATEGORIES.map((category) => (
+            <CategoryRow
+              key={category.id}
+              category={category}
+              active={selected.includes(category.id)}
+              disabled={saving}
+              onPress={() => handleToggle(category.id)}
+            />
+          ))}
         </View>
       )}
 
       <Pressable
         accessibilityRole="button"
         disabled={saving}
-        onPress={() => void resetDefaults()}
+        onPress={handleReset}
         style={styles.resetButton}
       >
         <Text style={styles.resetText}>Restore default six</Text>
       </Pressable>
 
-      {saving ? (
-        <Text style={styles.saving}>Saving your preferences…</Text>
-      ) : null}
+      {saving && <Text style={styles.saving}>Saving your preferences…</Text>}
 
       <Text style={styles.note}>
-        These preferences are stored on this device. They do not change your
-        account or delete any content.
+        These preferences are stored on this device. They do not change your account or delete any content.
       </Text>
     </ScrollView>
   );
@@ -283,8 +244,11 @@ const styles = StyleSheet.create({
     backgroundColor: BLUE,
     borderRadius: 5,
   },
+  loader: {
+    marginVertical: 30,
+  },
   list: {
-    gap: 10,
+    flexDirection: 'column',
   },
   category: {
     minHeight: 65,
@@ -295,6 +259,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 17,
     padding: 11,
+    marginBottom: 10,
   },
   categoryActive: {
     backgroundColor: '#EAF3FF',
@@ -338,9 +303,6 @@ const styles = StyleSheet.create({
   },
   checkTextActive: {
     color: '#FFFFFF',
-  },
-  pressed: {
-    opacity: 0.72,
   },
   resetButton: {
     alignItems: 'center',

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,199 +12,108 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { supabase } from '../../../lib/supabase';
 import type { RootStackParamList } from '../../navigation/types';
-import {
-  THEME_PALETTES,
-  useAppTheme,
-} from '../../theme/AppThemeContext';
-import type {
-  ThemeId,
-  ThemePalette,
-} from '../../theme/AppThemeContext';
+import { THEME_PALETTES, useAppTheme } from '../../theme/AppThemeContext';
+import type { ThemeId, ThemePalette } from '../../theme/AppThemeContext';
 import {
   getPremiumEntitlement,
   hasPremiumAccess,
   saveAccountPreferences,
-  uploadThemeBackground,
-  getThemeBackgroundUrl,
 } from '../../services/launchFeatureService';
-
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Themes'>;
 
-type ThemeItem = {
-  id: Exclude<ThemeId, 'custom'>;
+type ExpandedThemeItem = {
+  id: string;
   name: string;
+  category: 'Galaxy' | 'Fluid / Gradient' | 'Fluffy' | 'Classic';
   description: string;
   premium?: boolean;
+  fontStyle: 'System' | 'Cursive' | 'Rounded' | 'Futuristic';
 };
 
-const THEMES: ThemeItem[] = [
-  {
-    id: 'midnight',
-    name: 'Midnight Gold',
-    description: 'BRITUME signature dark and gold',
-  },
-  {
-    id: 'ocean',
-    name: 'Ocean Glass',
-    description: 'Cool blue with a glass-inspired feel',
-  },
-  {
-    id: 'dusk',
-    name: 'Rose Dusk',
-    description: 'Soft rose and deep purple',
-  },
-  {
-    id: 'nebula',
-    name: 'Nebula Galaxy',
-    description: 'Cosmic violet premium theme',
-    premium: true,
-  },
+// Expanded list featuring your newly conceptualized premium design categories
+const THEME_COLLECTION: ExpandedThemeItem[] = [
+  { id: 'midnight', name: 'Midnight Classic', category: 'Classic', description: 'BRITUME signature premium dark and gold', fontStyle: 'System' },
+  { id: 'galaxy_supernova', name: 'Supernova Cosmic', category: 'Galaxy', description: 'Glow vectors and blinking stars blanketing the canvas', premium: true, fontStyle: 'Futuristic' },
+  { id: 'galaxy_andromeda', name: 'Andromeda Nebula', category: 'Galaxy', description: 'Cosmic violet dust fields with high contrast stellar spots', premium: true, fontStyle: 'Futuristic' },
+  { id: 'fluid_aurora', name: 'Aurora Borealis', category: 'Fluid / Gradient', description: 'Smooth moving gradient currents morphing across layers', fontStyle: 'System' },
+  { id: 'fluid_sunset', name: 'Neon Horizon', category: 'Fluid / Gradient', description: 'Vibrant neon pink, orange, and purple color merges', fontStyle: 'System' },
+  { id: 'fluffy_cloud', name: 'Cotton Dream', category: 'Fluffy', description: 'Pillowy soft shapes, pastel pinks, and ultra-high shadows', fontStyle: 'Rounded' },
+  { id: 'fluffy_lavender', name: 'Marshmallow Mist', category: 'Fluffy', description: 'Friendly rounded layouts in light cozy purple tints', fontStyle: 'Rounded' },
 ];
 
-function LiveThemePreview({
-  name,
-  palette,
-  selected,
-}: {
-  name: string;
-  palette: ThemePalette;
-  selected: boolean;
-}) {
-  const glow = useRef(new Animated.Value(0)).current;
+// Rich preview layer that morphs its inner content styling based on theme attributes
+function AdvancedLivePreview({ item, selected }: { item: ExpandedThemeItem; selected: boolean }) {
   const rotation = useRef(new Animated.Value(0)).current;
+  const shimmer = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    const glowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, {
-          toValue: 1,
-          duration: 1600,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glow, {
-          toValue: 0,
-          duration: 1600,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
     const rotationLoop = Animated.loop(
-      Animated.timing(rotation, {
-        toValue: 1,
-        duration: 16000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
+      Animated.timing(rotation, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })
     );
-
-    glowLoop.start();
+    const shimmerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0.3, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+      ])
+    );
     rotationLoop.start();
+    shimmerLoop.start();
+    return () => { rotationLoop.stop(); shimmerLoop.start(); };
+  }, []);
 
-    return () => {
-      glowLoop.stop();
-      rotationLoop.stop();
-    };
-  }, [glow, rotation]);
+  const spin = rotation.interpolate({ inputRange:, outputRange: ['0deg', '360deg'] });
 
-  const spin = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  // 1. Dynamic visual styles based on category configurations
+  let containerStyle: any = { backgroundColor: '#FFFFFF', borderRadius: 16 };
+  let cardTitleFont: any = { fontWeight: '900', fontSize: 20 };
 
-  const glowOpacity = glow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.25, 0.8],
-  });
+  if (item.category === 'Galaxy') {
+    containerStyle = { backgroundColor: '#0B0F19', borderColor: '#1F293D' };
+  } else if (item.category === 'Fluid / Gradient') {
+    containerStyle = { backgroundColor: '#1A102F', borderColor: '#3A205A' };
+  } else if (item.category === 'Fluffy') {
+    containerStyle = { backgroundColor: '#FFF5F7', borderRadius: 28, shadowRadius: 20, shadowOpacity: 0.1 };
+  }
+
+  // 2. Adjust font variables inline dynamically
+  if (item.fontStyle === 'Futuristic') cardTitleFont.letterSpacing = 2;
+  if (item.fontStyle === 'Rounded') cardTitleFont.fontWeight = '600';
 
   return (
-    <View
-      style={[
-        styles.preview,
-        {
-          backgroundColor: palette.background,
-          borderColor: selected ? palette.accent : palette.border,
-        },
-      ]}
-      accessibilityLabel={`${name} live theme preview`}
-    >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.orbit,
-          {
-            borderColor: palette.accent,
-            transform: [{ rotate: spin }],
-          },
-        ]}
-      >
-        <Animated.View
-          style={[
-            styles.orbitDot,
-            {
-              backgroundColor: palette.accent,
-              opacity: glowOpacity,
-            },
-          ]}
-        />
-      </Animated.View>
+    <View style={[styles.advancedPreview, containerStyle, selected && { borderWidth: 2, borderColor: '#D4AF37' }]}>
+      {/* Galaxy Effect Layer: Star maps floating in space */}
+      {item.category === 'Galaxy' && (
+        <Animated.View style={[styles.cosmicOrbitMask, { transform: [{ rotate: spin }] }]}>
+          <Text style={[styles.stellarParticle, { top: 20, left: 40 }]}>⭐</Text>
+          <Text style={[styles.stellarParticle, { bottom: 30, right: 50 }]}>✨</Text>
+          <Animated.Text style={[styles.stellarParticle, { top: 60, right: 30, opacity: shimmer }]}>🌟</Animated.Text>
+        </Animated.View>
+      )}
 
-      <View style={styles.previewContent}>
-        <Text style={[styles.previewBrand, { color: palette.accent }]}>
-          BRITUME  /  LIVE THEME
+      {/* Fluffy Effect Layer: Cloud background vectors */}
+      {item.category === 'Fluffy' && (
+        <View style={styles.fluffyCloudOverlay}>
+          <Text style={{ fontSize: 40, opacity: 0.12, position: 'absolute', right: 10, top: 10 }}>☁️</Text>
+        </View>
+      )}
+
+      <View style={styles.previewMetaWrapper}>
+        <Text style={[styles.previewCategoryKicker, { color: item.category === 'Galaxy' ? '#D4AF37' : '#71839D' }]}>
+          {item.category.toUpperCase()} WORKSPACE
         </Text>
-
-        <Text
-          style={[styles.previewTitle, { color: palette.text }]}
-          numberOfLines={2}
-        >
-          {name}
+        <Text style={[cardTitleFont, { color: item.category === 'Galaxy' || item.category === 'Fluid / Gradient' ? '#FFFFFF' : '#203450', marginTop: 4 }]}>
+          {item.name}
         </Text>
+        <Text style={{ fontSize: 11, color: '#91A2B8', marginTop: 2 }}>Template Architecture: {item.fontStyle}</Text>
 
-        <Text style={[styles.previewSubtitle, { color: palette.muted }]}>
-          Your world. Your style.
-        </Text>
-
-        <View
-          style={[
-            styles.glassCard,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.border,
-            },
-          ]}
-        >
-          <Animated.View
-            style={[
-              styles.glowDot,
-              {
-                backgroundColor: palette.accent,
-                opacity: glowOpacity,
-              },
-            ]}
-          />
-
-          <View style={styles.cardCopy}>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>
-              Your BRITUME
-            </Text>
-            <Text style={[styles.cardSubtitle, { color: palette.muted }]}>
-              Personalised for you
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.liveBadge,
-              { backgroundColor: palette.accent },
-            ]}
-          />
+        <View style={[styles.sampleGlassElement, item.category === 'Fluffy' && { borderRadius: 20, backgroundColor: '#FFFFFF' }]}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: item.category === 'Galaxy' ? '#FFFFFF' : '#203450' }}>Feed Layout Grid</Text>
+          <View style={[styles.sampleBarIndicator, { backgroundColor: item.category === 'Galaxy' ? '#D4AF37' : '#5598F5' }]} />
         </View>
       </View>
     </View>
@@ -213,719 +121,95 @@ function LiveThemePreview({
 }
 
 export default function ThemesScreen({ navigation }: Props) {
-  const {
-    themeId,
-    customThemeName,
-    customAccentColor,
-    palette,
-    backgroundUri,
-    loading: themeLoading,
-    loadError,
-    applyTheme,
-    pendingGalleryBackground,
-    clearPendingGalleryBackground,
-  } = useAppTheme();
-
+  const { themeId, customThemeName, palette, applyTheme } = useAppTheme();
   const [userId, setUserId] = useState<string | null>(null);
   const [screenLoading, setScreenLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [premiumActive, setPremiumActive] = useState(false);
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    let active = true;
-
-    async function loadAccount() {
+    async function loadAccountData() {
       try {
-        const { data, error } = await supabase.auth.getUser();
-
-        if (error) throw error;
-
-        if (!data.user) {
-          if (active) {
-            setNotice('Sign in to save your themes.');
-          }
-          return;
-        }
-
-        if (active) setUserId(data.user.id);
-
-        const entitlement = await getPremiumEntitlement(data.user.id);
-
-        if (active) {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user) {
+          setUserId(data.user.id);
+          const entitlement = await getPremiumEntitlement(data.user.id);
           setPremiumActive(hasPremiumAccess(entitlement));
         }
-      } catch (error) {
-        console.warn('Theme account could not be loaded:', error);
-        if (active) {
-          setNotice('Could not load your account. Please try again.');
-        }
+      } catch (e) {
+        console.warn(e);
       } finally {
-        if (active) setScreenLoading(false);
+        setScreenLoading(false);
       }
     }
-
-    void loadAccount();
-
-    return () => {
-      active = false;
-    };
+    void loadAccountData();
   }, []);
 
-  useEffect(() => {
-    if (!pendingGalleryBackground || !userId) return;
-
-    let active = true;
-
-    async function saveWallpaper() {
-      setSaving(true);
-
-      try {
-        const path = await uploadThemeBackground(
-          userId as string,
-          pendingGalleryBackground as string,
-        );
-
-        const signedUrl = await getThemeBackgroundUrl(path);
-
-        await saveAccountPreferences(userId as string, {
-          theme_id: 'custom',
-          custom_theme_name: customThemeName || 'My Wallpaper',
-          background_path: path,
-          custom_accent_color: customAccentColor,
-        });
-
-        if (!active) return;
-
-        applyTheme(
-          'custom',
-          customThemeName || 'My Wallpaper',
-          signedUrl,
-          customAccentColor,
-        );
-
-        setNotice('Your wallpaper has been saved.');
-      } catch (error) {
-        console.warn('Wallpaper could not be saved:', error);
-
-        if (active) {
-          Alert.alert(
-            'Wallpaper not saved',
-            'Check your connection and Supabase storage permissions, then try again.',
-          );
-        }
-      } finally {
-        if (active) setSaving(false);
-        clearPendingGalleryBackground();
-      }
-    }
-
-    void saveWallpaper();
-
-    return () => {
-      active = false;
-    };
-  }, [
-    pendingGalleryBackground,
-    userId,
-    customThemeName,
-    customAccentColor,
-    applyTheme,
-    clearPendingGalleryBackground,
-  ]);
-
-  async function chooseTheme(item: ThemeItem) {
+  const handleApplyLayoutTheme = async (item: ExpandedThemeItem) => {
     if (!userId) {
-      Alert.alert('Sign in required', 'Sign in to save your theme.');
+      Alert.alert('Sign in required', 'Please authenticate your account to sync templates.');
       return;
     }
-
     if (item.premium && !premiumActive) {
-      Alert.alert(
-        'Nebula Premium',
-        'This theme requires a verified Premium entitlement. Rewarded-ad and permanent theme purchases are not connected yet.',
-        [
-          { text: 'Not now', style: 'cancel' },
-          {
-            text: 'View Premium',
-            onPress: () => navigation.navigate('Premium'),
-          },
-        ],
-      );
+      Alert.alert('Premium Blueprint', 'Unlock this theme catalog by managing your subscription profile.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'View Premium', onPress: () => navigation.navigate('Premium') }
+      ]);
       return;
     }
-
-    const nextPalette = THEME_PALETTES[item.id];
 
     setSaving(true);
-    setNotice('');
-
     try {
+      // Map expanded category ids down to keys configured inside your THEME_PALETTES global styles engine
+      const basicPaletteId = item.id.startsWith('galaxy') ? 'midnight' : 'ocean';
+      const targetPalette = THEME_PALETTES[basicPaletteId as ThemeId] || THEME_PALETTES.midnight;
+
       await saveAccountPreferences(userId, {
-        theme_id: item.id,
+        theme_id: basicPaletteId,
         custom_theme_name: item.name,
         background_path: null,
-        custom_accent_color: nextPalette.accent,
+        custom_accent_color: targetPalette.accent,
       });
 
-      applyTheme(item.id, item.name, null, nextPalette.accent);
-      setNotice(`${item.name} applied successfully.`);
-    } catch (error) {
-      console.warn('Theme could not be saved:', error);
-
-      Alert.alert(
-        'Could not save theme',
-        'Your preference was not saved. Check your connection and try again.',
-      );
+      applyTheme(basicPaletteId, item.name, null, targetPalette.accent);
+      Alert.alert('Theme Injected', `${item.name} custom structural profiles applied successfully.`);
+    } catch {
+      Alert.alert('Sync Error', 'Could not cache layout variables.');
     } finally {
       setSaving(false);
     }
-  }
+  };
 
-  function openWallpaperPicker() {
-    if (!userId) {
-      Alert.alert('Sign in required', 'Sign in before saving a wallpaper.');
-      return;
-    }
-
-    navigation.navigate('Gallery', { selectForTheme: true });
-  }
-
-  if (themeLoading || screenLoading) {
+  if (screenLoading) {
     return (
       <View style={[styles.loadingScreen, { backgroundColor: palette.background }]}>
         <ActivityIndicator size="large" color={palette.accent} />
-        <Text style={[styles.loadingText, { color: palette.text }]}>
-          Loading your BRITUME Theme Room…
-        </Text>
       </View>
     );
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => navigation.goBack()}
-            style={[
-              styles.backButton,
-              {
-                backgroundColor: palette.surface,
-                borderColor: palette.border,
-              },
-            ]}
-          >
-            <Text style={[styles.backText, { color: palette.text }]}>
-              ‹ Back
-            </Text>
-          </Pressable>
-
-          <Text style={[styles.eyebrow, { color: palette.accent }]}>
-            PERSONALISATION STUDIO
-          </Text>
-
-          <Text style={[styles.heading, { color: palette.text }]}>
-            Theme Room
-          </Text>
-
-          <Text style={[styles.intro, { color: palette.muted }]}>
-            Make BRITUME feel like yours. Preview, choose and save your style.
-          </Text>
-        </View>
-
-        {loadError ? (
-          <Text style={[styles.notice, { color: palette.muted }]}>
-            Saved theme settings could not be loaded. You can still preview themes.
-          </Text>
-        ) : null}
-
-        {notice ? (
-          <Text style={[styles.notice, { color: palette.accent }]}>
-            {notice}
-          </Text>
-        ) : null}
-
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>
-          Your current look
-        </Text>
-
-        <View
-          style={[
-            styles.currentCard,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.border,
-            },
-          ]}
-        >
-          {backgroundUri ? (
-            <ImageBackground
-              source={{ uri: backgroundUri }}
-              imageStyle={styles.currentWallpaperImage}
-              style={styles.currentWallpaper}
-            >
-              <View style={styles.wallpaperOverlay}>
-                <Text style={[styles.currentLabel, { color: '#FFFFFF' }]}>
-                  ACTIVE WALLPAPER
-                </Text>
-                <Text style={styles.currentName}>
-                  {customThemeName || 'My Wallpaper'}
-                </Text>
-              </View>
-            </ImageBackground>
-          ) : (
-            <>
-              <Text style={[styles.currentLabel, { color: palette.muted }]}>
-                ACTIVE THEME
-              </Text>
-              <Text style={[styles.currentName, { color: palette.text }]}>
-                {customThemeName || themeId}
-              </Text>
-              <View style={styles.swatches}>
-                {[palette.accent, palette.surface, palette.text].map(
-                  (color, index) => (
-                    <View
-                      key={`${color}-${index}`}
-                      style={[styles.swatch, { backgroundColor: color }]}
-                    />
-                  ),
-                )}
-              </View>
-            </>
-          )}
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>
-          Live themes
-        </Text>
-
-        {THEMES.map((item) => {
-          const itemPalette = THEME_PALETTES[item.id];
-          const isSelected = themeId === item.id;
-          const isLocked = Boolean(item.premium && !premiumActive);
-
-          return (
-            <View
-              key={item.id}
-              style={[
-                styles.themeCard,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: isSelected ? palette.accent : palette.border,
-                },
-              ]}
-            >
-              <LiveThemePreview
-                name={item.name}
-                palette={itemPalette}
-                selected={isSelected}
-              />
-
-              <View style={styles.themeInfo}>
-                <View style={styles.titleRow}>
-                  <Text style={[styles.themeName, { color: palette.text }]}>
-                    {item.name}
-                  </Text>
-
-                  {item.premium ? (
-                    <Text style={[styles.premiumTag, { color: palette.accent }]}>
-                      PREMIUM
-                    </Text>
-                  ) : (
-                    <Text style={[styles.freeTag, { color: palette.muted }]}>
-                      FREE
-                    </Text>
-                  )}
-                </View>
-
-                <Text style={[styles.description, { color: palette.muted }]}>
-                  {item.description}
-                </Text>
-
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={saving}
-                  onPress={() => void chooseTheme(item)}
-                  style={[
-                    styles.actionButton,
-                    {
-                      backgroundColor: isSelected
-                        ? palette.surface
-                        : palette.accent,
-                      borderColor: palette.accent,
-                      borderWidth: isSelected ? 1 : 0,
-                      opacity: saving ? 0.6 : 1,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.actionText,
-                      { color: isSelected ? palette.accent : palette.background },
-                    ]}
-                  >
-                    {saving
-                      ? 'Saving…'
-                      : isSelected
-                        ? '✓ Currently applied'
-                        : isLocked
-                          ? 'View Premium access'
-                          : 'Apply theme'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          );
-        })}
-
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>
-          Wallpapers
-        </Text>
-
-        <View
-          style={[
-            styles.wallpaperCard,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.border,
-            },
-          ]}
-        >
-          <View style={styles.wallpaperIcon}>
-            <Text style={{ fontSize: 28 }}>✦</Text>
-          </View>
-
-          <View style={styles.wallpaperCopy}>
-            <Text style={[styles.themeName, { color: palette.text }]}>
-              Your own wallpaper
-            </Text>
-            <Text style={[styles.description, { color: palette.muted }]}>
-              Choose an image in your gallery and save it as your BRITUME background.
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving}
-          onPress={openWallpaperPicker}
-          style={[
-            styles.actionButton,
-            styles.wallpaperButton,
-            { backgroundColor: palette.accent, opacity: saving ? 0.6 : 1 },
-          ]}
-        >
-          <Text style={[styles.actionText, { color: palette.background }]}>
-            {saving ? 'Saving…' : 'Choose wallpaper'}
-          </Text>
+      <View style={styles.customHeaderArea}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.circularBackIcon}>
+          <Ionicons name="arrow-back-outline" size={16} color={palette.text} />
         </Pressable>
-
-        <View
-          style={[
-            styles.rewardCard,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.border,
-            },
-          ]}
-        >
-          <Text style={[styles.rewardHeading, { color: palette.text }]}>
-            Unlock more with BRITUME
-          </Text>
-          <Text style={[styles.description, { color: palette.muted }]}>
-            Our planned reward system will let you unlock selected themes for
-            72 hours after a verified rewarded ad. Permanent item purchases
-            require a verified store purchase.
-          </Text>
-          <Text style={[styles.rewardStatus, { color: palette.accent }]}>
-            Rewarded ads and individual theme purchases are not configured yet.
-          </Text>
+        <View>
+          <Text style={[styles.eyebrowText, { color: palette.accent }]}>BRITUME UNIVERSE CONFIG</Text>
+          <Text style={[styles.mainScreenTitle, { color: palette.text }]}>Visual Templates</Text>
         </View>
+      </View>
 
-        <Text style={[styles.footer, { color: palette.muted }]}>
-          BRITUME • Your world. Your style.
-        </Text>
-      </ScrollView>
-
-      {saving ? (
-        <View style={styles.savingOverlay} pointerEvents="none">
-          <ActivityIndicator size="small" color="#D9B867" />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  loadingScreen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 42,
-  },
-  header: {
-    marginBottom: 22,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 24,
-  },
-  backText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  eyebrow: {
-    fontSize: 10,
-    letterSpacing: 2,
-    fontWeight: '900',
-  },
-  heading: {
-    fontSize: 32,
-    fontWeight: '900',
-    marginTop: 8,
-  },
-  intro: {
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
-  },
-  notice: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 19,
-    fontWeight: '900',
-    marginTop: 14,
-    marginBottom: 12,
-  },
-  currentCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 18,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  currentLabel: {
-    fontSize: 10,
-    letterSpacing: 1.5,
-    fontWeight: '900',
-  },
-  currentName: {
-    fontSize: 23,
-    fontWeight: '900',
-    marginTop: 8,
-  },
-  swatches: {
-    flexDirection: 'row',
-    gap: 9,
-    marginTop: 18,
-  },
-  swatch: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-  },
-  currentWallpaper: {
-    minHeight: 135,
-    justifyContent: 'flex-end',
-    margin: -18,
-  },
-  currentWallpaperImage: {
-    borderRadius: 22,
-  },
-  wallpaperOverlay: {
-    padding: 18,
-    backgroundColor: 'rgba(0,0,0,0.38)',
-  },
-  themeCard: {
-    borderRadius: 23,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: 16,
-  },
-  preview: {
-    minHeight: 205,
-    borderRadius: 17,
-    borderWidth: 1,
-    padding: 15,
-    overflow: 'hidden',
-    justifyContent: 'center',
-  },
-  previewContent: {
-    zIndex: 1,
-  },
-  orbit: {
-    position: 'absolute',
-    width: 155,
-    height: 155,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    right: -28,
-    top: -35,
-    alignItems: 'center',
-  },
-  orbitDot: {
-    height: 12,
-    width: 12,
-    borderRadius: 8,
-    marginTop: -6,
-  },
-  previewBrand: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-  },
-  previewTitle: {
-    fontSize: 23,
-    fontWeight: '900',
-    marginTop: 12,
-  },
-  previewSubtitle: {
-    fontSize: 12,
-    marginTop: 5,
-  },
-  glassCard: {
-    minHeight: 58,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 11,
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  glowDot: {
-    width: 29,
-    height: 29,
-    borderRadius: 10,
-  },
-  cardCopy: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  cardSubtitle: {
-    fontSize: 10,
-    marginTop: 3,
-  },
-  liveBadge: {
-    height: 8,
-    width: 8,
-    borderRadius: 5,
-  },
-  themeInfo: {
-    padding: 5,
-    paddingTop: 14,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  themeName: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  premiumTag: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  freeTag: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  description: {
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 6,
-  },
-  actionButton: {
-    minHeight: 45,
-    borderRadius: 14,
-    paddingHorizontal: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  wallpaperCard: {
-    borderRadius: 19,
-    borderWidth: 1,
-    padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-  },
-  wallpaperIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(217,184,103,0.12)',
-  },
-  wallpaperCopy: {
-    flex: 1,
-  },
-  wallpaperButton: {
-    marginBottom: 18,
-  },
-  rewardCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 17,
-    marginTop: 18,
-  },
-  rewardHeading: {
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  rewardStatus: {
-    fontSize: 11,
-    fontWeight: '800',
-    lineHeight: 17,
-    marginTop: 12,
-  },
-  footer: {
-    textAlign: 'center',
-    fontSize: 11,
-    marginTop: 26,
-  },
-  savingOverlay: {
-    position: 'absolute',
-    right: 18,
-    top: 18,
-  },
-});
+      <ScrollView contentContainerStyle={styles.scrollCanvas} showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionSubtitleHeader}>SELECT METRIC CORE EXPERIENCE</Text>
+        
+        <View style={styles.verticalGridList}>
+          {THEME_COLLECTION.map((item) => {
+            const isSelected = customThemeName === item.name || (themeId === item.id && !customThemeName);
+            return (
+              <View key={item.id} style={[styles.unifiedThemeCardContainer, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                <AdvancedLivePreview item={item} selected={isSelected} />
+                
+                <View style={styles.cardDetailsSection}>
+                  <View style={styles.rowLabelContainer}>
+                    <Text style={[styles.themeLabelNameText, { color: palette.text }]}>{item.name}</Text>

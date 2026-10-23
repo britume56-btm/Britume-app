@@ -1,4 +1,3 @@
-
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import { supabase } from '../../../lib/supabase';
 import {
@@ -30,7 +30,7 @@ import type { ProfileRecord } from '../../types/profile';
 const C = {
   background: '#F2F7FF',
   surface: '#FFFFFF',
-  glass: 'rgba(255,255,255,0.82)',
+  glass: 'rgba(255,255,255,0.92)',
   blue: '#5598F5',
   blueDark: '#2869C7',
   paleBlue: '#EAF3FF',
@@ -39,6 +39,7 @@ const C = {
   muted: '#71839D',
   green: '#299D79',
   purple: '#8A75E8',
+  gold: '#D4AF37',
 };
 
 type CardProps = {
@@ -51,17 +52,19 @@ const GlassCard = memo(function GlassCard({ children, style }: CardProps) {
 });
 
 type ToolCardProps = {
-  symbol: string;
+  iconName: string;
   title: string;
   subtitle: string;
   onPress: () => void;
+  iconColor?: string;
 };
 
 const ToolCard = memo(function ToolCard({
-  symbol,
+  iconName,
   title,
   subtitle,
   onPress,
+  iconColor = C.blueDark,
 }: ToolCardProps) {
   return (
     <Pressable
@@ -74,19 +77,22 @@ const ToolCard = memo(function ToolCard({
       ]}
     >
       <View style={styles.toolIcon}>
-        <Text style={styles.toolSymbol}>{symbol}</Text>
+        <Ionicons name={iconName} size={18} color={iconColor} />
       </View>
-      <Text style={styles.toolTitle}>{title}</Text>
-      <Text style={styles.toolSubtitle}>{subtitle}</Text>
-      <Text style={styles.toolAction}>Explore →</Text>
+      <View style={styles.toolTextColumn}>
+        <Text style={styles.toolTitle}>{title}</Text>
+        <Text style={styles.toolSubtitle}>{subtitle}</Text>
+      </View>
+      <Ionicons name="chevron-forward-outline" size={14} color={C.muted} />
     </Pressable>
   );
 });
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }: any) {
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState(''); // New custom biography state
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,6 +112,7 @@ export default function ProfileScreen() {
         setProfile(null);
         setUsername('');
         setDisplayName('');
+        setBio('');
         setAvatarPath(null);
         setAvatarUrl(null);
         return;
@@ -140,6 +147,8 @@ export default function ProfileScreen() {
       setProfile(record);
       setUsername(record.username ?? '');
       setDisplayName(record.display_name ?? '');
+      // Handle fallback bio if database column is present or uses user metadata attributes
+      setBio(record.raw_profile_data?.bio ?? 'See Beyond. Move Forward.');
 
       setAvatarPath(
         record.avatar_path ??
@@ -195,7 +204,7 @@ export default function ProfileScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        aspect: [1, 1],
+        aspect:,
         quality: 0.8,
       });
 
@@ -266,6 +275,7 @@ export default function ProfileScreen() {
         return;
       }
 
+      // Appending bio inside raw metadata dictionary profile payload fields
       const updated = await saveProfile({
         id: user.id,
         username: cleanUsername,
@@ -273,7 +283,8 @@ export default function ProfileScreen() {
           cleanDisplayName || user.email?.split('@')[0] || 'BRITUME User',
         avatar_path: avatarPath,
         phone: user.phone ?? null,
-      });
+        raw_profile_data: { bio: bio.trim() },
+      } as any);
 
       if (!updated) {
         Alert.alert(
@@ -286,6 +297,7 @@ export default function ProfileScreen() {
       setProfile(updated);
       setUsername(updated.username ?? '');
       setDisplayName(updated.display_name ?? '');
+      setBio(updated.raw_profile_data?.bio ?? '');
       setAvatarPath(updated.avatar_path ?? null);
 
       Alert.alert('Profile saved', 'Your BRITUME profile has been updated.');
@@ -297,7 +309,7 @@ export default function ProfileScreen() {
     } finally {
       setSaving(false);
     }
-  }, [username, displayName, avatarPath, saving, uploading]);
+  }, [username, displayName, bio, avatarPath, saving, uploading]);
 
   const comingSoon = useCallback((name: string) => {
     Alert.alert(
@@ -351,434 +363,3 @@ export default function ProfileScreen() {
       >
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.brand}>BRITUME</Text>
-            <Text style={styles.heading}>Your Universe</Text>
-            <Text style={styles.tagline}>See Beyond. Move Forward.</Text>
-          </View>
-          <View style={styles.profilePill}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.pillText}>MY PROFILE</Text>
-          </View>
-        </View>
-
-        <GlassCard style={styles.hero}>
-          <View style={styles.avatarRing}>
-            <View style={styles.avatarFrame}>
-              {avatarUrl ? (
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={styles.avatar}
-                  accessibilityLabel="Profile picture"
-                />
-              ) : (
-                <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarLetter}>B</Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          <Text style={styles.displayName}>
-            {displayName || 'Your Display Name'}
-          </Text>
-          <Text style={styles.handle}>@{username || 'yourusername'}</Text>
-          <Text style={styles.heroDescription}>
-            Your world. Your vision. Your creations.
-          </Text>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={pickAvatar}
-            disabled={uploading}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.pressed,
-              uploading && styles.disabled,
-            ]}
-          >
-            {uploading ? (
-              <ActivityIndicator color={C.blueDark} />
-            ) : (
-              <Text style={styles.secondaryButtonText}>
-                ✧  Change profile photo
-              </Text>
-            )}
-          </Pressable>
-        </GlassCard>
-
-        <View style={styles.sectionHeading}>
-          <Text style={styles.sectionTitle}>Your identity</Text>
-          <Text style={styles.sectionNote}>PERSONALIZE</Text>
-        </View>
-
-        <GlassCard>
-          <Text style={styles.label}>USERNAME</Text>
-          <TextInput
-            value={username}
-            onChangeText={setUsername}
-            placeholder="yourhandle"
-            placeholderTextColor="#91A2B8"
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            maxLength={30}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            accessibilityLabel="Username"
-            style={styles.input}
-          />
-
-          <Text style={styles.label}>DISPLAY NAME</Text>
-          <TextInput
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Your display name"
-            placeholderTextColor="#91A2B8"
-            autoCapitalize="words"
-            autoCorrect={false}
-            maxLength={60}
-            returnKeyType="done"
-            accessibilityLabel="Display name"
-            style={styles.input}
-          />
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={saveProfileData}
-            disabled={saving || uploading}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.pressed,
-              (saving || uploading) && styles.disabled,
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save changes  →</Text>
-            )}
-          </Pressable>
-        </GlassCard>
-
-        <View style={styles.sectionHeading}>
-          <View>
-            <Text style={styles.sectionTitle}>Creator Room</Text>
-            <Text style={styles.sectionSubheading}>
-              Tools for your next idea
-            </Text>
-          </View>
-          <Text style={styles.sparkle}>✦</Text>
-        </View>
-
-        <View style={styles.toolGrid}>
-          <ToolCard
-            symbol="♫"
-            title="Music Studio"
-            subtitle="Beats and music"
-            onPress={() => comingSoon('Music Studio')}
-          />
-          <ToolCard
-            symbol="▧"
-            title="Photo Lab"
-            subtitle="Edit your photos"
-            onPress={() => comingSoon('Photo Lab')}
-          />
-          <ToolCard
-            symbol="✧"
-            title="Cartoon Studio"
-            subtitle="Create scenes"
-            onPress={() => comingSoon('Cartoon Studio')}
-          />
-          <ToolCard
-            symbol="◈"
-            title="My Creations"
-            subtitle="Your portfolio"
-            onPress={() => comingSoon('My Creations')}
-          />
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerBrand}>BRITUME</Text>
-          <Text style={styles.footerTagline}>SEE BEYOND. MOVE FORWARD.</Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: C.background,
-  },
-  container: {
-    paddingHorizontal: 18,
-    paddingTop: 20,
-    paddingBottom: 42,
-    gap: 17,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: C.background,
-    gap: 14,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  brand: {
-    color: C.blueDark,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 3,
-  },
-  heading: {
-    color: C.text,
-    fontSize: 27,
-    fontWeight: '900',
-    marginTop: 5,
-  },
-  tagline: {
-    color: C.muted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  profilePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: C.green,
-  },
-  pillText: {
-    color: C.muted,
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  card: {
-    backgroundColor: C.glass,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 23,
-    padding: 18,
-    shadowColor: '#7FA9DD',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 15,
-    elevation: 2,
-  },
-  hero: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  avatarRing: {
-    width: 124,
-    height: 124,
-    borderRadius: 62,
-    borderWidth: 3,
-    borderColor: '#C6DFFF',
-    padding: 5,
-    marginBottom: 14,
-  },
-  avatarFrame: {
-    flex: 1,
-    borderRadius: 58,
-    overflow: 'hidden',
-    backgroundColor: C.paleBlue,
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLetter: {
-    color: C.blue,
-    fontSize: 45,
-    fontWeight: '900',
-  },
-  displayName: {
-    color: C.text,
-    fontSize: 22,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  handle: {
-    color: C.blueDark,
-    fontSize: 14,
-    marginTop: 5,
-  },
-  heroDescription: {
-    color: C.muted,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  secondaryButton: {
-    paddingVertical: 11,
-    paddingHorizontal: 17,
-    borderRadius: 14,
-    backgroundColor: C.paleBlue,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  secondaryButtonText: {
-    color: C.blueDark,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  sectionHeading: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  sectionTitle: {
-    color: C.text,
-    fontSize: 19,
-    fontWeight: '900',
-  },
-  sectionNote: {
-    color: C.blueDark,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  sectionSubheading: {
-    color: C.muted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  label: {
-    color: C.muted,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginTop: 7,
-    marginBottom: 8,
-  },
-  input: {
-    minHeight: 49,
-    backgroundColor: '#F8FBFF',
-    borderColor: C.border,
-    borderWidth: 1,
-    borderRadius: 13,
-    color: C.text,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    marginBottom: 13,
-  },
-  primaryButton: {
-    minHeight: 49,
-    borderRadius: 15,
-    backgroundColor: C.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    marginTop: 5,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  disabled: {
-    opacity: 0.55,
-  },
-  toolGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  toolCard: {
-    flexGrow: 1,
-    flexBasis: '44%',
-    minHeight: 150,
-    padding: 14,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-  },
-  toolIcon: {
-    width: 41,
-    height: 41,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.paleBlue,
-    marginBottom: 11,
-  },
-  toolSymbol: {
-    color: C.blueDark,
-    fontSize: 23,
-    fontWeight: '800',
-  },
-  toolTitle: {
-    color: C.text,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  toolSubtitle: {
-    color: C.muted,
-    fontSize: 10,
-    marginTop: 5,
-  },
-  toolAction: {
-    color: C.blueDark,
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 12,
-  },
-  sparkle: {
-    color: C.purple,
-    fontSize: 25,
-  },
-  pressed: {
-    opacity: 0.78,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 5,
-  },
-  footerBrand: {
-    color: C.blueDark,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 4,
-  },
-  footerTagline: {
-    color: C.muted,
-    fontSize: 9,
-    letterSpacing: 1.3,
-    marginTop: 7,
-  },
-  muted: {
-    color: C.muted,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-});

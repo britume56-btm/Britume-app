@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
@@ -7,24 +8,29 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useCategoryStore } from '../useCategoryStore'; // Adjusted path relative to src/screens
+import { useCategoryStore } from './useCategoryStore';
 
-// Map category metadata locally for quick layout lookups on the Home dashboard
-const CATEGORY_MAP: Record<string, { name: string; icon: string; screenName: string }> = {
-  SOCIAL: { name: 'Social', icon: '👥', screenName: 'GalleryScreen' },
-  CHAT: { name: 'Chat', icon: '💬', screenName: 'SettingsScreen' }, // Map to your respective screens
-  TECHNOLOGIES: { name: 'Technology', icon: '⚡', screenName: 'ModulesScreen' },
-  TV: { name: 'TV', icon: '▶️', screenName: 'HomeScreen' },
-  STUDIOS: { name: 'Studios', icon: '🎬', screenName: 'HomeScreen' },
-  WEAR: { name: 'Wear', icon: '👕', screenName: 'HomeScreen' },
-  GAMES: { name: 'Games', icon: '🎮', screenName: 'GamesScreen' },
-  FOUNDATION: { name: 'Foundation', icon: '◇', screenName: 'HomeScreen' },
-  LABS: { name: 'Labs', icon: '🧪', screenName: 'LabsScreen' },
-  THEMES: { name: 'Themes', icon: '🎨', screenName: 'ThemesScreen' },
-  GALLERY: { name: 'Gallery', icon: '🖼️', screenName: 'GalleryScreen' },
-  NOTIFICATIONS: { name: 'Notifications', icon: '🔔', screenName: 'NotificationsScreen' },
-  PREMIUM: { name: 'Premium', icon: '✦', screenName: 'PremiumScreen' },
-  SECURITY: { name: 'Security', icon: '🔒', screenName: 'SettingsScreen' },
+type CategoryInfo = {
+  name: string;
+  icon: string;
+};
+
+const CATEGORY_MAP: Record<string, CategoryInfo> = {
+  SOCIAL: { name: 'Social', icon: '👥' },
+  CHAT: { name: 'Chat', icon: '💬' },
+  TECHNOLOGIES: { name: 'Technology', icon: '⚡' },
+  TV: { name: 'TV', icon: '▶️' },
+  STUDIOS: { name: 'Studios', icon: '🎬' },
+  WEAR: { name: 'Wear', icon: '👕' },
+  GAMES: { name: 'Games', icon: '🎮' },
+  FOUNDATION: { name: 'Foundation', icon: '◇' },
+  LABS: { name: 'Labs', icon: '🧪' },
+  THEMES: { name: 'Themes', icon: '🎨' },
+  GALLERY: { name: 'Gallery', icon: '🖼️' },
+  NOTIFICATIONS: { name: 'Notifications', icon: '🔔' },
+  PREMIUM: { name: 'Premium', icon: '✦' },
+  SECURITY: { name: 'Security', icon: '🔒' },
+  SETTINGS: { name: 'Settings', icon: '⚙️' },
 };
 
 const BLUE = '#5598F5';
@@ -32,56 +38,125 @@ const TEXT = '#203450';
 const MUTED = '#71839D';
 
 export default function HomeScreen({ navigation }: any) {
-  // Pull the reactive arrays directly from your global zustand store
   const { selected, loading, loadCategories } = useCategoryStore();
 
-  // Load preferences seamlessly if they haven't been fetched yet
   useEffect(() => {
     void loadCategories();
   }, [loadCategories]);
 
+  const openCategory = (categoryId: string) => {
+    switch (categoryId) {
+      case 'SOCIAL':
+        navigation.navigate('Social');
+        return;
+
+      case 'CHAT':
+        navigation.navigate('Chat');
+        return;
+
+      case 'GAMES':
+        navigation.navigate('Games');
+        return;
+
+      case 'THEMES':
+        navigation.navigate('Themes');
+        return;
+
+      case 'GALLERY':
+        navigation.navigate('Gallery');
+        return;
+
+      case 'NOTIFICATIONS':
+        navigation.navigate('Notifications');
+        return;
+
+      case 'PREMIUM':
+        navigation.navigate('Premium');
+        return;
+
+      case 'SECURITY':
+        navigation.navigate('Security');
+        return;
+
+      case 'SETTINGS':
+        navigation.navigate('SETTINGS');
+        return;
+
+      case 'TECHNOLOGIES':
+      case 'TV':
+      case 'STUDIOS':
+      case 'WEAR':
+      case 'FOUNDATION':
+      case 'LABS':
+        navigation.navigate('Module', {
+          section: categoryId,
+        });
+        return;
+
+      default:
+        return;
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
       <Text style={styles.brand}>BRITUME</Text>
       <Text style={styles.heading}>LIVING Dashboard</Text>
-      
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Shortcuts</Text>
-        <Pressable 
-          onPress={() => navigation.navigate('ManageCategoriesScreen')}
+
+        <Pressable
           accessibilityRole="button"
+          onPress={() => navigation.navigate('ManageCategories')}
         >
           <Text style={styles.manageLink}>Edit Shortcuts</Text>
         </Pressable>
       </View>
 
       {loading ? (
-        <ActivityIndicator color={BLUE} size="small" style={styles.loader} />
+        <ActivityIndicator
+          color={BLUE}
+          size="small"
+          style={styles.loader}
+        />
       ) : (
         <View style={styles.grid}>
-          {selected.map((categoryId) => {
-            const data = CATEGORY_MAP[categoryId];
-            if (!data) return null;
+          {selected.map((categoryId: string) => {
+            const category = CATEGORY_MAP[categoryId];
+
+            if (!category) {
+              return null;
+            }
 
             return (
               <Pressable
                 key={categoryId}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${category.name}`}
                 style={({ pressed }) => [
                   styles.shortcutCard,
-                  pressed && styles.pressed
+                  pressed && styles.pressed,
                 ]}
-                onPress={() => navigation.navigate(data.screenName)}
+                onPress={() => openCategory(categoryId)}
               >
-                <Text style={styles.icon}>{data.icon}</Text>
+                <Text style={styles.icon}>{category.icon}</Text>
+
                 <Text style={styles.name} numberOfLines={1}>
-                  {data.name}
+                  {category.name}
                 </Text>
               </Pressable>
             );
           })}
-          
+
           {selected.length === 0 && (
-            <Text style={styles.emptyText}>No shortcuts added yet. Tap "Edit" to configure your board.</Text>
+            <Text style={styles.emptyText}>
+              No shortcuts added yet. Tap "Edit Shortcuts"
+              to configure your dashboard.
+            </Text>
           )}
         </View>
       )}
@@ -140,8 +215,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 14,
-    // Divide grid equally into 3-column rows accounting for gaps
-    width: '31%', 
+    width: '31%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',

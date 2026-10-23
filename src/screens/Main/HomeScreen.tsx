@@ -1,221 +1,170 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
+  Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import Ionicons from 'react-native-vector-icons/Ionicons'; 
-import { useAppTheme } from '../../theme/AppThemeContext';
-import { createPost, listFeed, type FeedPost } from '../../services/socialService';
-import { supabase } from '../../../lib/supabase';
+import { useCategoryStore } from '../useCategoryStore'; // Adjusted path relative to src/screens
 
-// Brand Color Palette Alignment
-const CANVAS_WHITE = '#FFFFFF'; 
-const SOFT_BLUE_SURFACE = '#F3F8FF'; 
-const SOFT_BLUE_BORDER = '#D6E6FB'; 
-const ACCENT_GOLD = '#D4AF37'; 
-const DARK_TEXT = '#1E293B';
-const MUTED_TEXT = '#64748B';
+// Map category metadata locally for quick layout lookups on the Home dashboard
+const CATEGORY_MAP: Record<string, { name: string; icon: string; screenName: string }> = {
+  SOCIAL: { name: 'Social', icon: '👥', screenName: 'GalleryScreen' },
+  CHAT: { name: 'Chat', icon: '💬', screenName: 'SettingsScreen' }, // Map to your respective screens
+  TECHNOLOGIES: { name: 'Technology', icon: '⚡', screenName: 'ModulesScreen' },
+  TV: { name: 'TV', icon: '▶️', screenName: 'HomeScreen' },
+  STUDIOS: { name: 'Studios', icon: '🎬', screenName: 'HomeScreen' },
+  WEAR: { name: 'Wear', icon: '👕', screenName: 'HomeScreen' },
+  GAMES: { name: 'Games', icon: '🎮', screenName: 'GamesScreen' },
+  FOUNDATION: { name: 'Foundation', icon: '◇', screenName: 'HomeScreen' },
+  LABS: { name: 'Labs', icon: '🧪', screenName: 'LabsScreen' },
+  THEMES: { name: 'Themes', icon: '🎨', screenName: 'ThemesScreen' },
+  GALLERY: { name: 'Gallery', icon: '🖼️', screenName: 'GalleryScreen' },
+  NOTIFICATIONS: { name: 'Notifications', icon: '🔔', screenName: 'NotificationsScreen' },
+  PREMIUM: { name: 'Premium', icon: '✦', screenName: 'PremiumScreen' },
+  SECURITY: { name: 'Security', icon: '🔒', screenName: 'SettingsScreen' },
+};
 
-// Consolidated Bottom Strip Icons (Labels removed from display layer)
-const BOTTOM_NAVIGATION_ICONS = [
-  { id: 'TECHNOLOGIES', icon: 'hardware-chip-outline' },
-  { id: 'SOCIAL', icon: 'people-outline' },
-  { id: 'STUDIOS', icon: 'film-outline' },
-  { id: 'WEAR', icon: 'shirt-outline' },
-  { id: 'LIVING', icon: 'home-outline' },
-  { id: 'FOUNDATION', icon: 'heart-outline' },
-  { id: 'TV', icon: 'tv-outline' },
-];
+const BLUE = '#5598F5';
+const TEXT = '#203450';
+const MUTED = '#71839D';
 
 export default function HomeScreen({ navigation }: any) {
-  useAppTheme();
+  // Pull the reactive arrays directly from your global zustand store
+  const { selected, loading, loadCategories } = useCategoryStore();
 
-  const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [draft, setDraft] = useState('');
-  const [userId, setUserId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadFeed = useCallback(async () => {
-    try {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        setUserId(data.user.id);
-        const result = await listFeed(data.user.id);
-        setPosts(result);
-      }
-    } catch {
-      // Safe fallback boundary
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
+  // Load preferences seamlessly if they haven't been fetched yet
   useEffect(() => {
-    void loadFeed();
-  }, [loadFeed]);
-
-  const toggleHidePost = (postId: string) => {
-    setPosts(prev => prev.filter(p => p.id !== postId));
-  };
+    void loadCategories();
+  }, [loadCategories]);
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <StatusBar barStyle="dark-content" backgroundColor={CANVAS_WHITE} />
-
-      {/* Top Banner Row: Custom Branding Top Left, Action Toolbar Top Right */}
-      <View style={styles.vortexHeaderRow}>
-        <View style={styles.brandTitleLeftContainer}>
-          <TouchableOpacity onPress={() => navigation.navigate('PROFILE')} style={styles.userProfileWrapperLeft}>
-            <View style={styles.crownCrownIndicator}>
-              <Text style={styles.crownMiniEmoji}>👑</Text>
-            </View>
-            <View style={styles.goldCrownAvatarRing}>
-              <Text style={styles.avatarLetter}>B</Text>
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.brandTextWordmark}>BRITUME</Text>
-        </View>
-
-        {/* High Density Sequential Toolbar Grid */}
-        <View style={styles.headerRightActionsToolbar}>
-          <TouchableOpacity style={styles.circleActionBtn}>
-            <Ionicons name="add-outline" size={16} color={DARK_TEXT} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.circleActionBtn}>
-            <Ionicons name="search-outline" size={15} color={DARK_TEXT} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.circleActionBtn}>
-            <Ionicons name="notifications-outline" size={15} color={DARK_TEXT} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.circleActionBtn}>
-            <Ionicons name="chatbubble-ellipses-outline" size={15} color={DARK_TEXT} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.circleActionBtn}>
-            <Ionicons name="sparkles-outline" size={15} color={ACCENT_GOLD} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SETTINGS')} style={styles.circleActionBtn}>
-            <Ionicons name="settings-outline" size={15} color={DARK_TEXT} />
-          </TouchableOpacity>
-        </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.brand}>BRITUME</Text>
+      <Text style={styles.heading}>LIVING Dashboard</Text>
+      
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Your Shortcuts</Text>
+        <Pressable 
+          onPress={() => navigation.navigate('ManageCategoriesScreen')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.manageLink}>Edit Shortcuts</Text>
+        </Pressable>
       </View>
 
-      {/* Main Core Discovery Canvas Scroll Area */}
-      <ScrollView
-        style={styles.feedScrollArea}
-        contentContainerStyle={styles.scrollCanvasContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadFeed(); }} tintColor={ACCENT_GOLD} />}
-      >
-        {/* Quick Status Input Panel */}
-        <View style={styles.cosmicStatusInputPanel}>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="What's on your mind?"
-            placeholderTextColor={MUTED_TEXT}
-            style={styles.statusInputBox}
-          />
+      {loading ? (
+        <ActivityIndicator color={BLUE} size="small" style={styles.loader} />
+      ) : (
+        <View style={styles.grid}>
+          {selected.map((categoryId) => {
+            const data = CATEGORY_MAP[categoryId];
+            if (!data) return null;
+
+            return (
+              <Pressable
+                key={categoryId}
+                style={({ pressed }) => [
+                  styles.shortcutCard,
+                  pressed && styles.pressed
+                ]}
+                onPress={() => navigation.navigate(data.screenName)}
+              >
+                <Text style={styles.icon}>{data.icon}</Text>
+                <Text style={styles.name} numberOfLines={1}>
+                  {data.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+          
+          {selected.length === 0 && (
+            <Text style={styles.emptyText}>No shortcuts added yet. Tap "Edit" to configure your board.</Text>
+          )}
         </View>
-
-        {loading ? (
-          <ActivityIndicator color={ACCENT_GOLD} style={{ marginTop: 40 }} />
-        ) : (
-          <View style={styles.dynamicFeedGridComposer}>
-            {posts.map((post, index) => {
-              const isVideoSpotlight = index % 3 === 2;
-
-              if (isVideoSpotlight) {
-                return (
-                  <View key={post.id} style={styles.fullWidthVideoCard}>
-                    <View style={styles.videoPlayerMaskContainer}>
-                      <Ionicons name="play-circle" size={40} color={ACCENT_GOLD} />
-                      <Text style={styles.videoBadgeLabel}>TV & DOWNLOADS</Text>
-                    </View>
-                    <Text style={styles.cardContentBodyText} numberOfLines={2}>{post.body}</Text>
-                    
-                    {/* Full-Scale Interaction Row */}
-                    <View style={styles.cardInteractiveActionRow}>
-                      <TouchableOpacity style={styles.actionBtn}><Ionicons name="heart-outline" size={14} color={MUTED_TEXT} /><Text style={styles.actionBtnLabel}>Like</Text></TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtn}><Ionicons name="chatbubble-outline" size={13} color={MUTED_TEXT} /><Text style={styles.actionBtnLabel}>Comment</Text></TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtn}><Ionicons name="share-social-outline" size={14} color={MUTED_TEXT} /><Text style={styles.actionBtnLabel}>Share</Text></TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtn}><Ionicons name="bookmark-outline" size={13} color={MUTED_TEXT} /><Text style={styles.actionBtnLabel}>Save</Text></TouchableOpacity>
-                      <TouchableOpacity onPress={() => toggleHidePost(post.id)} style={styles.actionBtn}><Ionicons name="eye-off-outline" size={14} color={MUTED_TEXT} /><Text style={styles.actionBtnLabel}>Hide</Text></TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              }
-
-              // Grid Image/Text Discovery Cards
-              return (
-                <View key={post.id} style={styles.halfWidthGridPostCard}>
-                  <View style={styles.cardImagePreviewPlaceholder}>
-                    <Ionicons name="image-outline" size={24} color={MUTED_TEXT} />
-                  </View>
-                  <Text style={styles.cardContentBodyText} numberOfLines={2}>{post.body}</Text>
-                  
-                  {/* Compact Nested Micro Actions */}
-                  <View style={styles.compactCardInteractiveActionRow}>
-                    <TouchableOpacity style={styles.microActionBtn}><Ionicons name="heart-outline" size={12} color={ACCENT_GOLD} /></TouchableOpacity>
-                    <TouchableOpacity style={styles.microActionBtn}><Ionicons name="chatbubble-outline" size={12} color={MUTED_TEXT} /></TouchableOpacity>
-                    <TouchableOpacity style={styles.microActionBtn}><Ionicons name="share-social-outline" size={12} color={MUTED_TEXT} /></TouchableOpacity>
-                    <TouchableOpacity style={styles.microActionBtn}><Ionicons name="bookmark-outline" size={11} color={MUTED_TEXT} /></TouchableOpacity>
-                    <TouchableOpacity onPress={() => toggleHidePost(post.id)} style={styles.microActionBtn}><Ionicons name="eye-off-outline" size={12} color={MUTED_TEXT} /></TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Flat Bottom Shortcut Dock Navigation Bar - Completely Label-Free */}
-      <View style={styles.bottomNavigationDockBar}>
-        {BOTTOM_NAVIGATION_ICONS.map((item) => (
-          <TouchableOpacity 
-            key={item.id} 
-            onPress={() => navigation.navigate(item.id === 'SOCIAL' ? 'Social' : 'Module', { section: item.id })}
-            style={styles.bottomDockTabItem}
-          >
-            <Ionicons name={item.icon} size={20} color={MUTED_TEXT} />
-          </TouchableOpacity>
-        ))}
-      </View>
-    </KeyboardAvoidingView>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: CANVAS_WHITE },
-  feedScrollArea: { flex: 1 },
-  scrollCanvasContent: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 16 },
-  
-  // Header Row Configurations
-  vortexHeaderRow: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: SOFT_BLUE_BORDER,
-    backgroundColor: CANVAS_WHITE,
+  container: {
+    flex: 1,
+    backgroundColor: '#F2F7FF',
   },
-  brandTitleLeftContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  brandTextWordmark: { color: ACCENT_GOLD, fontSize: 15, fontWeight: '900', letterSpacing: 0.8 },
-  
-  // Compact Top Left Micro Branding Asset
-  userProfileWrapperLeft: { width: 24, height: 24, position: 'relative', marginRight: 2 },
+  content: {
+    padding: 18,
+  },
+  brand: {
+    color: '#2869C7',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
+  heading: {
+    color: TEXT,
+    fontSize: 26,
+    fontWeight: '900',
+    marginTop: 8,
+    marginBottom: 25,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    color: TEXT,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  manageLink: {
+    color: '#2869C7',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  loader: {
+    marginVertical: 20,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  shortcutCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D7E7FC',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    // Divide grid equally into 3-column rows accounting for gaps
+    width: '31%', 
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    fontSize: 24,
+    marginBottom: 6,
+  },
+  name: {
+    color: TEXT,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  pressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.96 }],
+  },
+  emptyText: {
+    color: MUTED,
+    fontSize: 13,
+    textAlign: 'center',
+    width: '100%',
+    marginTop: 10,
+  },
+});

@@ -36,7 +36,7 @@ type SettingsNavigationProp = CompositeNavigationProp<
 BottomTabNavigationProp<MainTabParamList, 'SETTINGS'>,
 NativeStackNavigationProp<RootStackParamList>
 
-«;»
+;
 
 type Preferences = {
 dataSaver: boolean;
@@ -123,13 +123,13 @@ const [storageError, setStorageError] = useState('');
 const [actionModal, setActionModal] = useState<
 'change-password' | 'delete-account' | null
 
-«(null);
+(null);
 const [currentPassword, setCurrentPassword] = useState('');
 const [newPassword, setNewPassword] = useState('');
 const [confirmPassword, setConfirmPassword] = useState('');
 const [confirmationEmail, setConfirmationEmail] = useState('');
 const [accountEmail, setAccountEmail] = useState('');
-const [actionBusy, setActionBusy] = useState(false);»
+const [actionBusy, setActionBusy] = useState(false);
 
 const appVersion =
 (appConfig as { expo?: { version?: string } }).expo?.version ?? '1.0.0';

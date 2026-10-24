@@ -134,6 +134,13 @@ const [actionBusy, setActionBusy] = useState(false);»
 const appVersion =
 (appConfig as { expo?: { version?: string } }).expo?.version ?? '1.0.0';
 
+const backgroundColor = palette?.background ?? '#F2F7FF';
+const surfaceColor = palette?.surface ?? '#FFFFFF';
+const textColor = palette?.text ?? '#203450';
+const mutedColor = palette?.muted ?? '#71839D';
+const borderColor = palette?.border ?? '#D7E7FC';
+const accentColor = palette?.primary ?? '#2869C7';
+
 const loadPreferences = useCallback(async () => {
 setPreferencesLoading(true);
 setPreferencesError('');
@@ -264,19 +271,19 @@ style: 'destructive',
 onPress: () => {
 void (async () => {
 try {
-const keys = (await AsyncStorage.getAllKeys()).filter((key) =>
-key.startsWith(OFFLINE_VIDEO_KEY_PREFIX),
+const keys = (await AsyncStorage.getAllKeys()).filter(
+(key) => key.startsWith(OFFLINE_VIDEO_KEY_PREFIX),
 );
 const entries = await AsyncStorage.multiGet(keys);
 
             for (const [, uri] of entries) {
-              if (uri) {
-                try {
-                  const file = new File(uri);
-                  if (file.exists) file.delete();
-                } catch {
-                  // Continue clearing other downloads.
-                }
+              if (!uri) continue;
+
+              try {
+                const file = new File(uri);
+                if (file.exists) file.delete();
+              } catch {
+                // Continue clearing other downloads.
               }
             }
 
@@ -353,9 +360,10 @@ if (mode === 'delete-account') {
     return;
   }
 
-  setAccountEmail(data.user?.email ?? '');
+  const email = data.user?.email ?? '';
+  setAccountEmail(email);
 
-  if (!data.user?.email) {
+  if (!email) {
     Alert.alert(
       'Account email unavailable',
       'Your account must have an email address to use this confirmation flow.',
@@ -375,7 +383,10 @@ setActionModal(null);
 
 async function changeAccountPassword() {
 if (!currentPassword) {
-Alert.alert('Current password required', 'Enter your current password.');
+Alert.alert(
+'Current password required',
+'Enter your current password.',
+);
 return;
 }
 
@@ -422,7 +433,10 @@ try {
   setNewPassword('');
   setConfirmPassword('');
 
-  Alert.alert('Password changed', 'Your account password was updated.');
+  Alert.alert(
+    'Password changed',
+    'Your account password was updated.',
+  );
 } catch (error) {
   Alert.alert(
     'Password change failed',
@@ -435,7 +449,10 @@ try {
 }
 
 async function deleteAccount() {
-if (!accountEmail || confirmationEmail.trim().toLowerCase() !== accountEmail.toLowerCase()) {
+if (
+!accountEmail ||
+confirmationEmail.trim().toLowerCase() !== accountEmail.toLowerCase()
+) {
 Alert.alert(
 'Email does not match',
 'Enter your account email exactly to confirm deletion.',
@@ -462,12 +479,16 @@ Alert.alert(
             if (sessionError) throw sessionError;
 
             if (!data.session) {
-              throw new Error('Your session has expired. Sign in again.');
+              throw new Error(
+                'Your session has expired. Sign in again.',
+              );
             }
 
             const { data: result, error } =
               await supabase.functions.invoke('delete-account', {
-                body: { confirmationEmail },
+                body: {
+                  confirmationEmail: confirmationEmail.trim(),
+                },
               });
 
             if (error) throw error;
@@ -520,13 +541,6 @@ Alert.alert(
 }
 }
 
-const backgroundColor = palette?.background ?? '#F2F7FF';
-const surfaceColor = palette?.surface ?? '#FFFFFF';
-const textColor = palette?.text ?? '#203450';
-const mutedColor = palette?.muted ?? '#71839D';
-const borderColor = palette?.border ?? '#D7E7FC';
-const accentColor = palette?.primary ?? '#2869C7';
-
 return (
 <View style={[styles.screen, { backgroundColor }]}>
 <ScrollView
@@ -546,12 +560,26 @@ Manage your account and app preferences
 </Text>
 </View>
 
-      <View style={[styles.headerIcon, { backgroundColor: surfaceColor, borderColor }]}>
-        <Ionicons name="settings-outline" size={24} color={accentColor} />
+      <View
+        style={[
+          styles.headerIcon,
+          { backgroundColor: surfaceColor, borderColor },
+        ]}
+      >
+        <Ionicons
+          name="settings-outline"
+          size={24}
+          color={accentColor}
+        />
       </View>
     </View>
 
-    <View style={[styles.card, { backgroundColor: surfaceColor, borderColor }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: surfaceColor, borderColor },
+      ]}
+    >
       <Text style={[styles.sectionTitle, { color: textColor }]}>
         Your account
       </Text>
@@ -560,13 +588,15 @@ Manage your account and app preferences
         <Pressable
           key={item.title}
           accessibilityRole="button"
-          onPress={() => void navigateTo(item.route)}
+          onPress={() => navigateTo(item.route)}
           style={({ pressed }) => [
             styles.settingRow,
             pressed && styles.pressed,
           ]}
         >
-          <View style={[styles.rowIcon, { backgroundColor: backgroundColor }]}>
+          <View
+            style={[styles.rowIcon, { backgroundColor }]}
+          >
             <Ionicons
               name={item.icon}
               size={20}
@@ -578,7 +608,9 @@ Manage your account and app preferences
             <Text style={[styles.rowTitle, { color: textColor }]}>
               {item.title}
             </Text>
-            <Text style={[styles.rowDescription, { color: mutedColor }]}>
+            <Text
+              style={[styles.rowDescription, { color: mutedColor }]}
+            >
               {item.body}
             </Text>
           </View>
@@ -593,20 +625,28 @@ Manage your account and app preferences
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => void openSettingsActionModal('change-password')}
+        onPress={() =>
+          void openSettingsActionModal('change-password')
+        }
         style={({ pressed }) => [
           styles.settingRow,
           pressed && styles.pressed,
         ]}
       >
         <View style={[styles.rowIcon, { backgroundColor }]}>
-          <Ionicons name="key-outline" size={20} color={accentColor} />
+          <Ionicons
+            name="key-outline"
+            size={20}
+            color={accentColor}
+          />
         </View>
         <View style={styles.rowText}>
           <Text style={[styles.rowTitle, { color: textColor }]}>
             Change account password
           </Text>
-          <Text style={[styles.rowDescription, { color: mutedColor }]}>
+          <Text
+            style={[styles.rowDescription, { color: mutedColor }]}
+          >
             Verify your current password before changing it.
           </Text>
         </View>
@@ -634,9 +674,11 @@ Manage your account and app preferences
         </View>
         <View style={styles.rowText}>
           <Text style={[styles.rowTitle, { color: textColor }]}>
-            Privacy & permissions
+            Privacy and permissions
           </Text>
-          <Text style={[styles.rowDescription, { color: mutedColor }]}>
+          <Text
+            style={[styles.rowDescription, { color: mutedColor }]}
+          >
             Manage BRITUME permissions in device settings.
           </Text>
         </View>
@@ -649,20 +691,28 @@ Manage your account and app preferences
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => void openSettingsActionModal('delete-account')}
+        onPress={() =>
+          void openSettingsActionModal('delete-account')
+        }
         style={({ pressed }) => [
           styles.settingRow,
           pressed && styles.pressed,
         ]}
       >
         <View style={[styles.rowIcon, styles.dangerIcon]}>
-          <Ionicons name="trash-outline" size={20} color="#C43D4D" />
+          <Ionicons
+            name="trash-outline"
+            size={20}
+            color="#C43D4D"
+          />
         </View>
         <View style={styles.rowText}>
           <Text style={[styles.rowTitle, styles.dangerText]}>
             Delete account
           </Text>
-          <Text style={[styles.rowDescription, { color: mutedColor }]}>
+          <Text
+            style={[styles.rowDescription, { color: mutedColor }]}
+          >
             Permanently request account deletion.
           </Text>
         </View>
@@ -674,13 +724,21 @@ Manage your account and app preferences
       </Pressable>
     </View>
 
-    <View style={[styles.card, { backgroundColor: surfaceColor, borderColor }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: surfaceColor, borderColor },
+      ]}
+    >
       <Text style={[styles.sectionTitle, { color: textColor }]}>
         Data and playback
       </Text>
 
       {preferencesLoading ? (
-        <ActivityIndicator color={accentColor} style={styles.loader} />
+        <ActivityIndicator
+          color={accentColor}
+          style={styles.loader}
+        />
       ) : (
         <>
           <PreferenceRow
@@ -726,13 +784,20 @@ Manage your account and app preferences
       )}
     </View>
 
-    <View style={[styles.card, { backgroundColor: surfaceColor, borderColor }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: surfaceColor, borderColor },
+      ]}
+    >
       <View style={styles.storageHeader}>
         <View style={styles.rowText}>
           <Text style={[styles.sectionTitle, { color: textColor }]}>
             Offline storage
           </Text>
-          <Text style={[styles.rowDescription, { color: mutedColor }]}>
+          <Text
+            style={[styles.rowDescription, { color: mutedColor }]}
+          >
             Videos saved for offline viewing on this device.
           </Text>
         </View>
@@ -743,16 +808,25 @@ Manage your account and app preferences
           onPress={() => void refreshOfflineStorage()}
           style={styles.smallIconButton}
         >
-          <Ionicons name="refresh-outline" size={18} color={accentColor} />
+          <Ionicons
+            name="refresh-outline"
+            size={18}
+            color={accentColor}
+          />
         </Pressable>
       </View>
 
       {storageLoading ? (
-        <ActivityIndicator color={accentColor} style={styles.loader} />
+        <ActivityIndicator
+          color={accentColor}
+          style={styles.loader}
+        />
       ) : (
         <>
           <View style={styles.storageStats}>
-            <View style={[styles.storageStat, { backgroundColor }]}>
+            <View
+              style={[styles.storageStat, { backgroundColor }]}
+            >
               <Text style={[styles.statValue, { color: textColor }]}>
                 {offlineCount}
               </Text>
@@ -761,7 +835,9 @@ Manage your account and app preferences
               </Text>
             </View>
 
-            <View style={[styles.storageStat, { backgroundColor }]}>
+            <View
+              style={[styles.storageStat, { backgroundColor }]}
+            >
               <Text style={[styles.statValue, { color: textColor }]}>
                 {formatStorageSize(offlineBytes)}
               </Text>
@@ -781,7 +857,11 @@ Manage your account and app preferences
               pressed && styles.pressed,
             ]}
           >
-            <Ionicons name="trash-outline" size={17} color="#C43D4D" />
+            <Ionicons
+              name="trash-outline"
+              size={17}
+              color="#C43D4D"
+            />
             <Text style={styles.secondaryButtonText}>
               Remove offline videos
             </Text>
@@ -802,12 +882,16 @@ Manage your account and app preferences
         pressed && styles.pressed,
       ]}
     >
-      <Ionicons name="log-out-outline" size={20} color="#C43D4D" />
+      <Ionicons
+        name="log-out-outline"
+        size={20}
+        color="#C43D4D"
+      />
       <Text style={styles.signOutText}>Sign out</Text>
     </Pressable>
 
     <Text style={[styles.versionText, { color: mutedColor }]}>
-      BRITUME · Version {appVersion}
+      BRITUME - Version {appVersion}
     </Text>
     <Text style={[styles.footerText, { color: mutedColor }]}>
       See Beyond. Move Forward.
@@ -821,7 +905,9 @@ Manage your account and app preferences
     onRequestClose={closeSettingsActionModal}
   >
     <View style={styles.modalBackdrop}>
-      <View style={[styles.modalCard, { backgroundColor: surfaceColor }]}>
+      <View
+        style={[styles.modalCard, { backgroundColor: surfaceColor }]}
+      >
         <View style={styles.modalHeader}>
           <Text style={[styles.modalTitle, { color: textColor }]}>
             {actionModal === 'change-password'
@@ -836,18 +922,31 @@ Manage your account and app preferences
             onPress={closeSettingsActionModal}
             style={styles.modalClose}
           >
-            <Ionicons name="close" size={23} color={mutedColor} />
+            <Ionicons
+              name="close"
+              size={23}
+              color={mutedColor}
+            />
           </Pressable>
         </View>
 
         {actionModal === 'change-password' ? (
           <>
-            <Text style={[styles.modalDescription, { color: mutedColor }]}>
-              Enter your current password and choose a new password with at least 8 characters.
+            <Text
+              style={[
+                styles.modalDescription,
+                { color: mutedColor },
+              ]}
+            >
+              Enter your current password and choose a new password
+              with at least 8 characters.
             </Text>
 
             <TextInput
-              style={[styles.modalInput, { color: textColor, borderColor }]}
+              style={[
+                styles.modalInput,
+                { color: textColor, borderColor },
+              ]}
               value={currentPassword}
               onChangeText={setCurrentPassword}
               placeholder="Current password"
@@ -857,7 +956,10 @@ Manage your account and app preferences
             />
 
             <TextInput
-              style={[styles.modalInput, { color: textColor, borderColor }]}
+              style={[
+                styles.modalInput,
+                { color: textColor, borderColor },
+              ]}
               value={newPassword}
               onChangeText={setNewPassword}
               placeholder="New password"
@@ -867,7 +969,10 @@ Manage your account and app preferences
             />
 
             <TextInput
-              style={[styles.modalInput, { color: textColor, borderColor }]}
+              style={[
+                styles.modalInput,
+                { color: textColor, borderColor },
+              ]}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               placeholder="Confirm new password"
@@ -880,27 +985,44 @@ Manage your account and app preferences
               accessibilityRole="button"
               disabled={actionBusy}
               onPress={() => void changeAccountPassword()}
-              style={[styles.modalPrimaryButton, actionBusy && styles.disabledButton]}
+              style={[
+                styles.modalPrimaryButton,
+                actionBusy && styles.disabledButton,
+              ]}
             >
               {actionBusy ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.modalPrimaryText}>Update password</Text>
+                <Text style={styles.modalPrimaryText}>
+                  Update password
+                </Text>
               )}
             </Pressable>
           </>
         ) : (
           <>
-            <Text style={[styles.modalDescription, { color: mutedColor }]}>
-              This action is permanent. Enter your account email to confirm. The request will only work if the delete-account Edge Function is deployed and configured correctly.
+            <Text
+              style={[
+                styles.modalDescription,
+                { color: mutedColor },
+              ]}
+            >
+              This action is permanent. Enter your account email to
+              confirm. The request requires the delete-account Edge
+              Function to be deployed and configured correctly.
             </Text>
 
-            <Text style={[styles.accountEmail, { color: textColor }]}>
+            <Text
+              style={[styles.accountEmail, { color: textColor }]}
+            >
               Account: {accountEmail}
             </Text>
 
             <TextInput
-              style={[styles.modalInput, { color: textColor, borderColor }]}
+              style={[
+                styles.modalInput,
+                { color: textColor, borderColor },
+              ]}
               value={confirmationEmail}
               onChangeText={setConfirmationEmail}
               placeholder="Enter your account email"
@@ -914,12 +1036,17 @@ Manage your account and app preferences
               accessibilityRole="button"
               disabled={actionBusy}
               onPress={() => void deleteAccount()}
-              style={[styles.modalDangerButton, actionBusy && styles.disabledButton]}
+              style={[
+                styles.modalDangerButton,
+                actionBusy && styles.disabledButton,
+              ]}
             >
               {actionBusy ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.modalPrimaryText}>Request account deletion</Text>
+                <Text style={styles.modalPrimaryText}>
+                  Request account deletion
+                </Text>
               )}
             </Pressable>
           </>
@@ -952,7 +1079,9 @@ mutedColor: string;
 return (
 <View style={styles.preferenceRow}>
 <View style={styles.rowText}>
-<Text style={[styles.rowTitle, { color: textColor }]}>{title}</Text>
+<Text style={[styles.rowTitle, { color: textColor }]}>
+{title}
+</Text>
 <Text style={[styles.rowDescription, { color: mutedColor }]}>
 {description}
 </Text>
@@ -961,7 +1090,10 @@ return (
   <Switch
     value={value}
     onValueChange={onValueChange}
-    trackColor={{ false: '#CBD5E1', true: accentColor }}
+    trackColor={{
+      false: '#CBD5E1',
+      true: accentColor,
+    }}
   />
 </View>
 

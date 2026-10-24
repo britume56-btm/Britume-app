@@ -36,7 +36,7 @@ type SettingsNavigationProp = CompositeNavigationProp<
 BottomTabNavigationProp<MainTabParamList, 'SETTINGS'>,
 NativeStackNavigationProp<RootStackParamList>
 
-;
+(;)
 
 type Preferences = {
 dataSaver: boolean;

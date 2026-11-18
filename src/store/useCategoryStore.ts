@@ -1,10 +1,8 @@
-// useCategoryStore.ts
-import { create } from 'zustand';
+import React, { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'britume-living-categories-v1';
 export const MAX_SHORTCUTS = 6;
-
 export const DEFAULTS = [
   'SOCIAL',
   'CHAT',
@@ -12,79 +10,98 @@ export const DEFAULTS = [
   'TV',
   'STUDIOS',
   'WEAR',
-];
+] as const;
 
-interface CategoryState {
+const VALID_IDS = new Set([
+  ...DEFAULTS,
+  'GAMES',
+  'FOUNDATION',
+  'LABS',
+  'THEMES',
+  'GALLERY',
+  'NOTIFICATIONS',
+  'PREMIUM',
+  'SECURITY',
+]);
+
+type CategoryState = {
   selected: string[];
   loading: boolean;
   saving: boolean;
-  loadCategories: () => Promise<void>;
-  toggleCategory: (id: string, onMaxReached: () => void, onError: (msg: string) => void) => Promise<void>;
-  resetDefaults: (onError: (msg: string) => void) => Promise<void>;
-}
+};
+type Listener = () => void;
 
-export const useCategoryStore = create<CategoryState>((set, get) => ({
-  selected: DEFAULTS,
+let state: CategoryState = {
+  selected: [...DEFAULTS],
   loading: true,
   saving: false,
+};
+const listeners = new Set<Listener>();
+const emit = () => listeners.forEach((listener) => listener());
+const setState = (patch: Partial<CategoryState>) => {
+  state = { ...state, ...patch };
+  emit();
+};
+const subscribe = (listener: Listener) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
 
-  loadCategories: async () => {
-    try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Filter valid strings (validation happens UI side or against static arrays)
-          const valid = parsed.filter((id): id is string => typeof id === 'string');
-          set({ selected: valid.slice(0, MAX_SHORTCUTS) });
-        }
+async function persistSelection(next: string[], onError: (message: string) => void) {
+  const previous = state.selected;
+  setState({ selected: next, saving: true });
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    setState({ selected: previous });
+    onError('Your category changes could not be saved.');
+  } finally {
+    setState({ saving: false });
+  }
+}
+
+async function loadCategories() {
+  setState({ loading: true });
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        const valid = [...new Set(parsed.filter(
+          (id): id is string => typeof id === 'string' && VALID_IDS.has(id),
+        ))].slice(0, MAX_SHORTCUTS);
+        setState({ selected: valid });
       }
-    } catch {
-      // Keep defaults if failed to load
-    } finally {
-      set({ loading: false });
     }
-  },
+  } catch {
+    // Keep defaults if storage is unavailable or malformed.
+  } finally {
+    setState({ loading: false });
+  }
+}
 
-  toggleCategory: async (id, onMaxReached, onError) => {
-    const { selected } = get();
-    const alreadySelected = selected.includes(id);
+async function toggleCategory(
+  id: string,
+  onMaxReached: () => void,
+  onError: (message: string) => void,
+) {
+  if (!VALID_IDS.has(id) || state.saving) return;
+  const selected = state.selected;
+  if (!selected.includes(id) && selected.length >= MAX_SHORTCUTS) {
+    onMaxReached();
+    return;
+  }
+  const next = selected.includes(id)
+    ? selected.filter((item) => item !== id)
+    : [...selected, id];
+  await persistSelection(next, onError);
+}
 
-    if (!alreadySelected && selected.length >= MAX_SHORTCUTS) {
-      onMaxReached();
-      return;
-    }
+async function resetDefaults(onError: (message: string) => void) {
+  await persistSelection([...DEFAULTS], onError);
+}
 
-    const baselineState = [...selected];
-    const updated = alreadySelected
-      ? selected.filter((item) => item !== id)
-      : [...selected, id];
-
-    // Optimistic Update
-    set({ selected: updated, saving: true });
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      set({ selected: baselineState });
-      onError('Your category changes could not be saved.');
-    } finally {
-      set({ saving: false });
-    }
-  },
-
-  resetDefaults: async (onError) => {
-    const baselineState = [...get().selected];
-    set({ saving: true });
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULTS));
-      set({ selected: [...DEFAULTS] });
-    } catch {
-      set({ selected: baselineState });
-      onError('Could not restore the default categories.');
-    } finally {
-      set({ saving: false });
-    }
-  },
-}));
+export function useCategoryStore() {
+  const snapshot = useSyncExternalStore(subscribe, () => state, () => state);
+  return { ...snapshot, loadCategories, toggleCategory, resetDefaults };
+}
